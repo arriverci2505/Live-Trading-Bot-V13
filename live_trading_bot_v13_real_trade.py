@@ -915,8 +915,77 @@ def main():
 # RUN
 # ════════════════════════════════════════════════════════════════════════════
 
-if __name__ == "__main__":
-    main()
+def main():
+    # ════════════════════════════════════════════════════════════════════════════
+    # SIDEBAR - SETTINGS & CONTROLS
+    # ════════════════════════════════════════════════════════════════════════════
+    st.sidebar.title("🤖 MONSTER BOT v13")
+    st.sidebar.markdown("---")
+
+    # 1. CHẾ ĐỘ GIAO DỊCH (AUTO TRADE SIMULATOR)
+    st.sidebar.subheader("🎮 Trading Mode")
+    is_auto_trade = st.sidebar.toggle("Bật Giao Dịch Giả Lập", value=False, help="Tự động vào lệnh giả lập khi có tín hiệu từ AI")
+    
+    if is_auto_trade:
+        st.sidebar.success("🤖 AUTO-TRADE: ĐANG CHẠY")
+    else:
+        st.sidebar.warning("⏸️ AUTO-TRADE: ĐANG DỪNG")
+
+    st.sidebar.markdown("---")
+    
+    # 2. CÀI ĐẶT CHIẾN THUẬT (TP/SL)
+    st.sidebar.subheader("⚙️ Chiến Thuật TP/SL")
+    atr_sl = st.sidebar.slider("Cắt lỗ (Stop Loss x ATR)", 1.0, 8.0, 4.0, 0.5, help="Khoảng cách cắt lỗ dựa trên độ biến động ATR")
+    atr_tp = st.sidebar.slider("Chốt lời (Take Profit x ATR)", 5.0, 40.0, 20.0, 1.0)
+    
+    st.sidebar.markdown("**Khóa lợi nhuận (Trailing):**")
+    use_trailing = st.sidebar.checkbox("Bật Profit Lock", value=True)
+
+    st.sidebar.markdown("---")
+
+    # 3. BỘ LỌC ĐỘ CHÍNH XÁC (FILTERS)
+    st.sidebar.subheader("🔍 Bộ Lọc Độ Chính Xác")
+    
+    # Lọc theo độ tự tin của AI
+    min_conf = st.sidebar.slider("Độ tự tin tối thiểu (%)", 50, 95, 75, 5)
+    
+    # Lọc theo xu hướng (SMA 200)
+    use_trend_filter = st.sidebar.toggle("Lọc Xu Hướng (SMA 200)", value=True, help="Chỉ BUY khi giá trên SMA 200, chỉ SELL khi giá dưới SMA 200")
+    
+    # Lọc theo sức mạnh thị trường (ADX)
+    min_adx = st.sidebar.slider("Sức mạnh xu hướng (Min ADX)", 10, 50, 20, help="Dưới 20 thị trường thường đi ngang (Sideway)")
+
+    st.sidebar.markdown("---")
+
+    # 4. THÔNG SỐ KỸ THUẬT
+    st.sidebar.subheader("🛠️ Thông Số Kỹ Thuật")
+    temp = st.sidebar.slider("Temperature (Độ nhạy AI)", 0.1, 1.5, 0.7, 0.1)
+    lev = st.sidebar.number_input("Đòn bẩy (Leverage)", 1, 125, 5)
+    refresh_sec = st.sidebar.number_input("Cập nhật (giây)", 10, 300, 60)
+
+    # Cập nhật các giá trị vào LIVE_CONFIG để logic phía dưới sử dụng
+    LIVE_CONFIG.update({
+        'temperature': temp,
+        'atr_multiplier_sl': atr_sl,
+        'atr_multiplier_tp': atr_tp,
+        'leverage': lev,
+        'refresh_interval': refresh_sec,
+        'min_confidence': min_conf / 100,
+        'use_trend_filter': use_trend_filter,
+        'min_adx': min_adx
+    })
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # LOAD DỮ LIỆU & HIỂN THỊ
+    # ════════════════════════════════════════════════════════════════════════════
+    model, feature_cols, model_config = load_model_and_assets(LIVE_CONFIG)
+    exchange = get_exchange(LIVE_CONFIG['exchange'])
+    
+    # Layout đã đảo (Signal trái, Chart phải)
+    col_signal, col_chart = st.columns([1, 1.8])
+    
+    # ... (tiếp tục phần code hiển thị cũ)
+
 
 
 
