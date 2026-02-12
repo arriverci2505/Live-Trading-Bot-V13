@@ -701,7 +701,7 @@ def main():
     exchange = get_exchange(LIVE_CONFIG['exchange'])
     
     # Layout
-    col_chart, col_signal = st.columns([1, 1.3])
+    col_signal, col_chart = st.columns([1, 1.3])
 
     # Signal Panel
     with col_signal:
@@ -917,6 +917,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
