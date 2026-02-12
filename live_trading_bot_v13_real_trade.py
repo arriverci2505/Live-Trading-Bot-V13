@@ -781,7 +781,7 @@ def main():
         current_time = time.time()
         
         # Check if should update
-        if current_time - last_update < refresh_interval:
+        if current_time - last_update < LIVE_CONFIG['refresh_interval']::
             time.sleep(1)
             continue
         
@@ -952,6 +952,7 @@ def main():
 # ════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     main()
+
 
 
 
