@@ -65,7 +65,7 @@ LIVE_CONFIG = {
         'dropout': 0.35,
         'num_classes': 3,
         'use_positional_encoding': True,
-    }
+    },
     
     # Market Regime
     'adx_threshold_trending': 25,
@@ -911,4 +911,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
