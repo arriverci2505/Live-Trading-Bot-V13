@@ -701,8 +701,16 @@ def main():
     exchange = get_exchange(LIVE_CONFIG['exchange'])
     
     # Layout
-    col_chart, col_signal = st.columns([1.3, 1])
-    
+    col_chart, col_signal = st.columns([1, 1.3])
+
+    # Signal Panel
+    with col_signal:
+        st.markdown("### 🤖 AI Prediction")
+        signal_container = st.empty()
+        metrics_container = st.empty()
+        regime_container = st.empty()
+        status_container = st.empty()
+        
     # TradingView Chart
     with col_chart:
         st.markdown("### 📊 Market View")
@@ -729,14 +737,6 @@ def main():
         </div>
         """
         components.html(tv_html, height=650)
-    
-    # Signal Panel
-    with col_signal:
-        st.markdown("### 🤖 AI Prediction")
-        signal_container = st.empty()
-        metrics_container = st.empty()
-        regime_container = st.empty()
-        status_container = st.empty()
     
     # Main loop
     last_update = 0
@@ -917,6 +917,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
