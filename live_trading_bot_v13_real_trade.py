@@ -313,7 +313,7 @@ def main():
 
             with signal_placeholder.container():
                 st.markdown(f"""
-                "<div class='signal-card'><h1 class='glow-text'>{final_sig}
+                <div class='signal-card'><h1 class='glow-text'>{final_sig}
                     <h1 style="color:{color}; margin:0; font-size:50px; letter-spacing:2px;">{final_sig}</h1>
                     <p style="color:white; margin-top:5px; font-weight:bold;">BTC: $ {price:,.1f} | AI CONF: {conf:.1%}</p>
                     <p style="color:#aaa; font-size:14px; margin:0; text-transform:uppercase;">{reason}</p>
@@ -367,6 +367,7 @@ if __name__ == "__main__":
             
 if __name__ == "__main__":
     main()
+
 
 
 
