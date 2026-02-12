@@ -164,29 +164,49 @@ def load_monster_model():
     return model
 
 def main():
-    st.set_page_config(page_title="TITAN INTEL TERMINAL v15.2", layout="wide")
+    st.set_page_config(page_title="TITAN INTEL TERMINAL v15.6", layout="wide")
 
-    # --- 1. INTELLIGENCE TERMINAL CSS ---
+    # --- 1. CLEAN INTELLIGENCE CSS (FIXED OVERLAP) ---
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        /* Cấu hình nền tảng */
         .stApp { background-color: #050505; font-family: 'JetBrains Mono', monospace; }
+        
+        /* Chỉ làm xanh các tiêu đề do mình tạo ra, không làm xanh toàn bộ hệ thống */
         .glow-text {
-            color: #00FF41; 
-            text-shadow: 0 0 5px #00FF41, 0 0 10px #00FF41;
-            font-family: 'JetBrains Mono', monospace;
+            color: #00FF41 !important; 
+            text-shadow: 0 0 5px #00FF41;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-weight: bold;
         }
+
+        /* Card tín hiệu: Sạch sẽ, không trùng lặp */
         .signal-card { 
             padding: 20px; border-radius: 5px; text-align: center; 
             border: 1px solid #00FF41; background: rgba(0, 255, 65, 0.05);
-            box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.2); margin-bottom: 15px;
+            margin-bottom: 15px;
         }
+
+        /* Trade Setup: Gọn gàng */
+        .trade-setup { 
+            background: #000; border: 1px dashed #444; 
+            padding: 10px; font-size: 13px; text-align: center; 
+            color: #00FF41;
+        }
+
+        /* Ép bảng dữ liệu về tông xanh nhưng không làm mờ chữ */
         [data-testid="stDataFrame"] { 
-            border: 1px solid #333; 
-            filter: brightness(0.8) sepia(1) hue-rotate(70deg); 
+            border: 1px solid #222; 
         }
-        h1, h2, h3, p, span, label { font-family: 'JetBrains Mono', monospace !important; color: #00FF41 !important; }
-        .trade-setup { background: #000; border: 1px dashed #00FF41; padding: 10px; font-size: 14px; text-align: center; }
+
+        /* Sidebar: Giữ nguyên màu gốc của Streamlit cho các Label để tránh trùng chữ */
+        .stSlider label, .stToggle label {
+            color: #888 !important;
+            font-size: 12px !important;
+        }
+        
         hr { border: 0.5px solid #111; }
         </style>
         
@@ -211,16 +231,13 @@ def main():
 
     with st.sidebar.expander("REGIME ANALYSIS", expanded=True):
         ui_adx_min = st.slider("Min ADX", 10, 50, 20)
-        ui_adx_max = st.slider("Max ADX", 50, 100, 100) # ĐÃ THÊM BIẾN NÀY ĐỂ HẾT LỖI
+        ui_adx_max = st.slider("Max ADX", 50, 100, 100)
         ui_use_dynamic = st.toggle("SMA Filter", value=True)
 
-    with st.sidebar.expander("EXTRACTION PROTOCOL", expanded=False):
+    with st.sidebar.expander("🛡️ EXIT PROTOCOL", expanded=True):
         ui_atr_sl = st.slider("Hard Stop (ATR)", 1.0, 10.0, 4.0)
         ui_atr_tp = st.slider("Target Exit (ATR)", 5.0, 50.0, 20.0)
-
-    with st.sidebar.expander("🛡️ ADVANCED EXIT PROTOCOL", expanded=True):
         ui_use_profit_lock = st.toggle("Enable Profit Lock", value=True)
-        st.info("Lock Levels: 2.5%->0.5% | 5.0%->3.0% | 10%->7.0%")
         
     if st.sidebar.button("TERMINATE LOGS"):
         st.session_state.trade_log = []
@@ -230,15 +247,15 @@ def main():
     col_left, col_right = st.columns([1.2, 1.8])
 
     with col_left:
-        st.markdown("<h3 class='glow-text'>> AI_ANALYSIS_STREAM</h3>", unsafe_allow_html=True)
+        st.markdown("<div class='glow-text' style='font-size:18px;'>> AI_ANALYSIS_STREAM</div>", unsafe_allow_html=True)
         signal_placeholder = st.empty()
         setup_placeholder = st.empty()
-        st.markdown("<h3 class='glow-text'>> AUDIT_TRAIL</h3>", unsafe_allow_html=True)
+        st.markdown("<div class='glow-text' style='font-size:18px; margin-top:20px;'>> AUDIT_TRAIL</div>", unsafe_allow_html=True)
         log_placeholder = st.empty()
 
     with col_right:
-        st.markdown("<h3 class='glow-text'>> LIVE_SATELLITE_FEED</h3>", unsafe_allow_html=True)
-        tv_html = f"""<div style="height:750px; border: 1px solid #00FF41; border-radius:5px; overflow:hidden; filter: grayscale(1) contrast(1.2) brightness(0.8) sepia(1) hue-rotate(70deg);">
+        st.markdown("<div class='glow-text' style='font-size:18px;'>> LIVE_SATELLITE_FEED</div>", unsafe_allow_html=True)
+        tv_html = f"""<div style="height:750px; border: 1px solid #222; border-radius:5px; overflow:hidden; filter: brightness(0.8) contrast(1.2) grayscale(0.5);">
         <div id="tv_chart_v15" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
         <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v15","style":"1","enable_publishing":false,"hide_side_toolbar":false,"allow_symbol_change":true}});</script></div>"""
@@ -291,18 +308,15 @@ def main():
                 if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Below SMA200"
                 if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200"
 
-            # 5.1 Signal Visualization (Đã sửa lỗi HTML lặp)
+            # 5.1 Signal Visualization (Fixed Overlap)
             sig_color = "#00FF41" if final_sig == "BUY" else "#FF3131" if final_sig == "SELL" else "#FFD700"
             
             with signal_placeholder.container():
-                # Xóa bỏ các thẻ h1 thừa, chỉ giữ lại một cấu trúc duy nhất
                 st.markdown(f"""
                 <div class='signal-card' style='border-color: {sig_color};'>
-                    <div class='glow-text' style='color:{sig_color} !important; font-size:45px; font-weight:bold; margin-bottom:10px;'>
-                        {final_sig}
-                    </div>
-                    <p style='margin:0; font-size:16px; color:white !important;'>PRICE: $ {price:,.1f} | CONF: {conf:.1%}</p>
-                    <p style='margin:5px 0 0 0; color:#666 !important; font-size:12px; text-transform:uppercase;'>System Status: {reason}</p>
+                    <div style='color:{sig_color}; font-size:45px; font-weight:bold; font-family:JetBrains Mono;'>{final_sig}</div>
+                    <div style='color:white; font-size:16px;'>BTC: ${price:,.1f} | AI: {conf:.1%}</div>
+                    <div style='color:#555; font-size:11px; margin-top:5px;'>{reason}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -312,44 +326,29 @@ def main():
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
                 rr = abs(tp_val - price) / abs(price - sl_val)
                 
-                # Lock Levels logic
-                l1_trigger = price * 1.025 if final_sig == "BUY" else price * 0.975
-                l1_lock = price * 1.005 if final_sig == "BUY" else price * 0.995
-                l2_trigger = price * 1.050 if final_sig == "BUY" else price * 0.950
-                l2_lock = price * 1.030 if final_sig == "BUY" else price * 0.970
-
                 with setup_placeholder.container():
-                    # Đưa R/R lên hàng đầu cho chuyên nghiệp
                     st.markdown(f"""
                     <div class="trade-setup">
-                        <div style="margin-bottom: 8px;">
-                            <span style="color:#FFFF00;">[R:R 1:{rr:.1f}]</span> | 
-                            <span style="color:#00FF88;">TP: {tp_val:,.1f}</span> | 
-                            <span style="color:#FF4B4B;">SL: {sl_val:,.1f}</span>
-                        </div>
-                        <div style="font-size: 11px; color: #444; border-top: 1px solid #111; padding-top: 5px;">
-                            AUTO-LOCK L1 @ {l1_trigger:,.1f} (SECURE: {l1_lock:,.1f})<br>
-                            AUTO-LOCK L2 @ {l2_trigger:,.1f} (SECURE: {l2_lock:,.1f})
-                        </div>
+                        <span style="color:#FFFF00; font-weight:bold;">[R:R 1:{rr:.1f}]</span> | 
+                        <span style="color:#00FF88;">TP: {tp_val:,.1f}</span> | 
+                        <span style="color:#FF4B4B;">SL: {sl_val:,.1f}</span>
                     </div>
                     """, unsafe_allow_html=True)
-                
-                # --- AUTO-BACKUP LOGIC ---
+
                 current_min = datetime.now().strftime("%H:%M")
                 if st.session_state.last_signal_time != current_min:
                     st.session_state.last_signal_time = current_min
                     new_entry = {
-                        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Time": datetime.now().strftime("%H:%M:%S"),
                         "Action": final_sig,
                         "Price": f"{price:,.1f}",
                         "Target": f"{tp_val:,.1f}",
                         "Stop": f"{sl_val:,.1f}",
-                        "RR": f"1:{rr:.1f}",
-                        "Conf": f"{conf:.1%}"
+                        "AI%": f"{conf:.1%}"
                     }
                     st.session_state.trade_log.insert(0, new_entry)
                     
-                    # Backup to CSV
+                    # Auto-Backup CSV
                     try:
                         file_name = "titan_audit_trail.csv"
                         pd.DataFrame([new_entry]).to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False)
@@ -359,10 +358,9 @@ def main():
             else:
                 setup_placeholder.empty()
 
-            # --- 5.3 AUDIT LOG REFRESH ---
             with log_placeholder.container():
                 if st.session_state.trade_log:
-                    st.dataframe(pd.DataFrame(st.session_state.trade_log).head(20), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(st.session_state.trade_log).head(15), use_container_width=True, hide_index=True)
 
             time.sleep(60)
             st.rerun()
@@ -373,6 +371,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
