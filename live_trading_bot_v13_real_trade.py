@@ -92,7 +92,7 @@ def enrich_features_v13(df):
     mdi = 100 * (pd.Series(minus_dm).rolling(p).mean() / df['ATR'])
     df['ADX'] = (100 * abs(pdi-mdi)/(pdi+mdi)).rolling(p).mean()
     
-        df['SMA_distance'] = (df['Close'].rolling(20).mean() - df['Close'].rolling(50).mean()) / df['Close'].rolling(50).mean()
+    df['SMA_distance'] = (df['Close'].rolling(20).mean() - df['Close'].rolling(50).mean()) / df['Close'].rolling(50).mean()
     df['regime_trending'] = (df['ADX'] > 25).astype(int)
     df['regime_uptrend'] = ((df['SMA_distance'] > 0) & (df['regime_trending'] == 1)).astype(int)
     df['regime_downtrend'] = ((df['SMA_distance'] < 0) & (df['regime_trending'] == 1)).astype(int)
@@ -238,3 +238,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
