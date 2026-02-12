@@ -316,7 +316,7 @@ def main():
                 if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Below SMA200"
                 if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200"
 
-# --- 5.1 SIGNAL VISUALIZATION (CRT GLOW EFFECT) ---
+            # --- 5.1 SIGNAL VISUALIZATION (CRT GLOW EFFECT) ---
             sig_color = "#00FF41" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
             glow_style = f"text-shadow: 0 0 20px {sig_color}, 0 0 30px {sig_color}; color: {sig_color} !important;"
 
@@ -325,7 +325,9 @@ def main():
                 <div class='signal-card' style='border-color: {sig_color};'>
                     <div style='{glow_style} font-size:60px; font-weight:bold; font-family:Fira Code;'>{final_sig}</div>
                     <div class='crt-glow' style='font-size:20px; color:white !important;'>UNIT_PRICE: ${price:,.1f}</div>
-                    <div class='crt-glow' style='font-size:14px; opacity:0.7;'>CONFIDENCE_LEVEL: {conf:.1% | STATUS: {reason}}</div>
+                    <div class='crt-glow' style='font-size:14px; opacity:0.7;'>
+                        CONFIDENCE: {conf:.1%} | STATUS: {reason}
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -398,6 +400,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
