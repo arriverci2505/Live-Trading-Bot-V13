@@ -156,198 +156,175 @@ def load_monster_model():
     return model
 
 def main():
-    st.set_page_config(page_title="MONSTER BOT v13.9 - PRO TRADER", layout="wide")
+    st.set_page_config(page_title="MONSTER BOT v14 - TITAN PRO", layout="wide")
 
-    # --- 1. CSS CHO GIAO DIỆN "THỰC CHIẾN" ---
+    # --- 1. CSS NÂNG CAO (Sửa lỗi thụt và làm đẹp viền) ---
     st.markdown("""
         <style>
-        /* Ẩn bớt padding thừa của Streamlit */
-        .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+        .main { background-color: #0e1117; }
+        .stMetric { border: 1px solid #333; padding: 10px; border-radius: 5px; }
         
-        /* Style cho Box Tín Hiệu Chính */
-        .signal-box {
-            border-radius: 12px;
-            padding: 20px;
+        /* Box Tín hiệu chính */
+        .signal-card {
+            padding: 30px;
+            border-radius: 15px;
             text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        
-        /* Style cho Box Setup Lệnh (Entry/SL/TP) */
-        .setup-box {
-            background-color: #161a25;
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 15px;
             margin-top: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
         }
         
-        /* Chữ số to rõ */
-        .big-number {
-            font-size: 28px;
-            font-weight: 800;
-            font-family: 'Consolas', monospace;
+        /* Bảng SL/TP */
+        .trade-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background: #161a25;
+            border: 2px solid #444;
+            border-radius: 10px;
         }
-        
-        /* Các dòng chú thích điều kiện */
-        .condition-pass { color: #00FF00; font-weight: bold; }
-        .condition-fail { color: #FF0000; font-weight: bold; }
-        .condition-wait { color: #FFFF00; font-weight: bold; }
+        .trade-table td {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+        .label-text { color: #888; font-size: 14px; font-weight: bold; }
+        .value-text { color: white; font-size: 24px; font-weight: bold; font-family: 'Courier New'; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- 2. SIDEBAR (CHỈ GIỮ CÁI CẦN THIẾT) ---
-    st.sidebar.title("🎛️ CONTROL PANEL")
+    # --- 2. SIDEBAR QUẢN LÝ ---
+    st.sidebar.title("🛠️ TITAN SETTINGS")
+    ui_atr_sl = st.sidebar.slider("Cắt lỗ (SL) - ATR x", 1.0, 5.0, 2.5, step=0.5)
+    ui_atr_tp = st.sidebar.slider("Chốt lời (TP) - ATR x", 2.0, 15.0, 5.0, step=0.5)
+    ui_min_conf = st.sidebar.slider("Độ tự tin tối thiểu (%)", 50, 95, 75, step=5)
     
-    st.sidebar.subheader("1. Quản lý vốn (Risk)")
-    ui_atr_sl = st.sidebar.slider("Hệ số Cắt lỗ (SL)", 1.0, 5.0, 2.0, step=0.5, help="SL = Giá - (ATR x Hệ số)")
-    ui_atr_tp = st.sidebar.slider("Hệ số Chốt lời (TP)", 2.0, 10.0, 4.0, step=0.5, help="TP = Giá + (ATR x Hệ số)")
-    
-    st.sidebar.subheader("2. Bộ lọc tín hiệu")
-    ui_min_conf = st.sidebar.slider("Độ tin cậy AI (%)", 60, 95, 75, step=5)
-    ui_use_trend = st.sidebar.checkbox("Chỉ đánh thuận xu hướng (SMA200)", value=True)
-    
-    # Nút dừng/chạy bot
-    if 'run_bot' not in st.session_state: st.session_state.run_bot = True
-    if st.sidebar.button("🛑 DỪNG BOT" if st.session_state.run_bot else "▶️ CHẠY BOT"):
-        st.session_state.run_bot = not st.session_state.run_bot
+    st.sidebar.markdown("---")
+    is_auto_trade = st.sidebar.toggle("Giao dịch ảo (Paper Trade)", value=True)
+    if st.sidebar.button("🗑️ Xóa Nhật Ký"):
+        st.session_state.trade_log = []
+        st.rerun()
 
-    # --- 3. KHỞI TẠO HỆ THỐNG ---
-    # Layout: Trái (Tín hiệu & Thông số) - Phải (Biểu đồ)
-    col_signal, col_chart = st.columns([1, 2])
+    # --- 3. LAYOUT CÂN BẰNG ---
+    col_left, col_right = st.columns([1.1, 1.9])
 
-    with col_signal:
-        main_signal_area = st.empty()  # Nơi hiển thị Box Tín Hiệu to đùng
-        setup_area = st.empty()        # Nơi hiển thị SL/TP khi có lệnh
-        checklist_area = st.empty()    # Nơi hiển thị lý do vào lệnh
+    with col_left:
+        st.subheader("🤖 AI ENGINE")
+        signal_placeholder = st.empty()
+        setup_placeholder = st.empty()
+        st.markdown("---")
+        st.subheader("📜 VIRTUAL TRADE LOG")
+        log_placeholder = st.empty()
 
-    with col_chart:
-        # Chart TradingView đơn giản, gọn nhẹ
-        tv_html = f"""<div style="height:600px; border: 2px solid #333; border-radius:10px; overflow:hidden;">
-        <div id="tv_chart_v13" style="height:100%;"></div>
+    with col_right:
+        st.subheader("📊 REAL-TIME CHART")
+        tv_html = f"""<div style="height:700px; border: 2px solid #444; border-radius:15px; overflow:hidden;">
+        <div id="tv_chart_v14" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
-        <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v13","timezone":"Asia/Ho_Chi_Minh","hide_side_toolbar":false,"details":false}});</script></div>"""
-        components.html(tv_html, height=605)
+        <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v14","timezone":"Asia/Ho_Chi_Minh","style":"1","toolbar_bg":"#f1f3f6","enable_publishing":false,"withdateranges":true,"hide_side_toolbar":false,"allow_symbol_change":true,"details":true,"hotlist":true,"calendar":true}});</script></div>"""
+        components.html(tv_html, height=710)
 
-    # Load Model & Config
+    # --- 4. LOGIC XỬ LÝ ---
+    if 'trade_log' not in st.session_state: st.session_state.trade_log = []
+    
     try:
         model = load_monster_model()
         exchange = ccxt.kraken({'enableRateLimit': True})
-        # List features cũ (vẫn cần để chạy model, nhưng không hiển thị)
-        feature_cols = [
-            'log_return', 'ATR', 'BB_width', 'BB_position', 'frac_diff_close',
-            'fourier_sin_1', 'fourier_sin_2', 'fourier_sin_3', 'fourier_sin_4', 'fourier_sin_5',
-            'fourier_cos_1', 'fourier_cos_2', 'fourier_cos_3', 'fourier_cos_4', 'fourier_cos_5',
-            'volume_imbalance', 'entropy', 'volume_ratio', 'ADX', 'SMA_distance',
-            'regime_trending', 'regime_uptrend', 'regime_downtrend', 'RSI', 'MACD',
-            'MACD_signal', 'volatility_zscore', 'RSI_vol_adj', 'ROC_vol_adj'
-        ]
+        feature_cols = ['log_return', 'ATR', 'BB_width', 'BB_position', 'frac_diff_close','fourier_sin_1', 'fourier_sin_2', 'fourier_sin_3', 'fourier_sin_4', 'fourier_sin_5','fourier_cos_1', 'fourier_cos_2', 'fourier_cos_3', 'fourier_cos_4', 'fourier_cos_5','volume_imbalance', 'entropy', 'volume_ratio', 'ADX', 'SMA_distance','regime_trending', 'regime_uptrend', 'regime_downtrend', 'RSI', 'MACD','MACD_signal', 'volatility_zscore', 'RSI_vol_adj', 'ROC_vol_adj']
     except Exception as e:
-        st.error(f"Lỗi khởi tạo: {e}")
-        return
+        st.error(f"Lỗi: {e}"); return
 
-    last_update = 0
-
-    # --- 4. VÒNG LẶP CHÍNH ---
-    while st.session_state.run_bot:
-        current_time = time.time()
-        # Refresh mỗi 60s (cố định cho đỡ rối)
-        if current_time - last_update < 60:
-            time.sleep(1)
-            continue
-            
+    while True:
         try:
-            # 4.1 Lấy dữ liệu & Tính toán
-            ohlcv = exchange.fetch_ohlcv(LIVE_CONFIG['symbol'], timeframe='15m', limit=400)
+            # Fetch data
+            ohlcv = exchange.fetch_ohlcv('BTC/USDT', timeframe='15m', limit=400)
             df = pd.DataFrame(ohlcv, columns=['ts','Open','High','Low','Close','Volume'])
             df_enriched = enrich_features_v13(df)
             df_norm = apply_rolling_normalization(df_enriched, feature_cols)
             
-            # 4.2 AI Dự đoán
-            X_last = df_norm[feature_cols].tail(LIVE_CONFIG['sequence_length']).values
+            # Predict
+            X_last = df_norm[feature_cols].tail(30).values
             X_tensor = torch.FloatTensor(X_last).unsqueeze(0)
             with torch.no_grad():
-                logits = model(X_tensor)
-                probs = torch.softmax(logits / 0.7, dim=-1).numpy()[0] # Temp cố định 0.7 cho ổn định
+                probs = torch.softmax(model(X_tensor) / 0.7, dim=-1).numpy()[0]
             
-            # 4.3 Xử lý Logic Tín hiệu
             conf = np.max(probs)
-            raw_idx = np.argmax(probs)
-            ai_sig = "BUY" if raw_idx == 1 else "SELL" if raw_idx == 2 else "NEUTRAL"
+            raw_sig = "BUY" if np.argmax(probs) == 1 else "SELL" if np.argmax(probs) == 2 else "NEUTRAL"
             
-            # Lấy thông số kỹ thuật hiện tại
+            # Metrics
             price = df['Close'].iloc[-1]
             atr = df_enriched['ATR'].iloc[-1]
-            adx = df_enriched['ADX'].iloc[-1]
             sma200 = df_enriched['SMA200'].iloc[-1]
             
-            # Logic lọc (Filter)
-            final_sig = ai_sig
-            status_msg = "SẴN SÀNG"
-            
-            # Các điều kiện check
-            is_conf_ok = conf >= (ui_min_conf / 100)
-            is_trend_ok = True
-            if ui_use_trend:
-                if ai_sig == "BUY" and price < sma200: is_trend_ok = False
-                if ai_sig == "SELL" and price > sma200: is_trend_ok = False
-            
-            # Quyết định cuối cùng
-            if not is_conf_ok:
-                final_sig = "NEUTRAL"
-                status_msg = "Độ tin cậy thấp"
-            elif not is_trend_ok:
-                final_sig = "NEUTRAL"
-                status_msg = "Ngược xu hướng SMA200"
-            elif adx < 20:
-                final_sig = "NEUTRAL"
-                status_msg = "Thị trường đi ngang (Sideway)"
+            # Final Decision
+            final_sig = raw_sig
+            reason = "TÍN HIỆU ĐẠT CHUẨN"
+            if conf < (ui_min_conf/100): 
+                final_sig = "NEUTRAL"; reason = f"Độ tự tin thấp ({conf:.0%})"
+            elif (raw_sig == "BUY" and price < sma200) or (raw_sig == "SELL" and price > sma200):
+                final_sig = "NEUTRAL"; reason = "Ngược xu hướng SMA200"
 
-            # --- 5. HIỂN THỊ GIAO DIỆN ---
+            # --- 5. HIỂN THỊ (SỬA LỖI VIỀN VÀ THỤT) ---
             
-            # 5.1 Cấu hình màu sắc & Viền
             if final_sig == "BUY":
-                box_color = "#00FF00"  # Xanh Neon
-                bg_color = "rgba(0, 50, 0, 0.8)"
-                icon = "🟢 MUA NGAY"
-                border = "4px solid #00FF00"
+                color, bg, border = "#00FF00", "rgba(0, 255, 0, 0.1)", "3px solid #00FF00"
             elif final_sig == "SELL":
-                box_color = "#FF0000"  # Đỏ Neon
-                bg_color = "rgba(50, 0, 0, 0.8)"
-                icon = "🔴 BÁN NGAY"
-                border = "4px solid #FF0000"
+                color, bg, border = "#FF0000", "rgba(255, 0, 0, 0.1)", "3px solid #FF0000"
             else:
-                box_color = "#FFFF00"  # Vàng
-                bg_color = "rgba(50, 50, 0, 0.3)"
-                icon = "⚠️ CHỜ TÍN HIỆU"
-                border = "3px dashed #FFFF00"
+                color, bg, border = "#FFFF00", "rgba(255, 255, 0, 0.05)", "2px dashed #FFFF00"
 
-            # 5.2 Hiển thị Box Tín Hiệu Chính
-            with main_signal_area.container():
+            # Box Tín Hiệu
+            with signal_placeholder.container():
                 st.markdown(f"""
-                <div class="signal-box" style="border: {border}; background-color: {bg_color};">
-                    <h2 style="color: {box_color}; margin:0; font-size: 40px; text-transform: uppercase; letter-spacing: 2px;">
-                        {icon}
-                    </h2>
-                    <p style="color: white; margin-top: 5px; font-size: 18px;">Giá hiện tại: <b>${price:,.2f}</b></p>
+                <div class="signal-card" style="background:{bg}; border:{border};">
+                    <h1 style="color:{color}; margin:0; font-size:55px;">{final_sig}</h1>
+                    <p style="color:white; font-size:18px; opacity:0.8;">{reason} | Conf: {conf:.1%}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # 5.3 Hiển thị Setup Lệnh (Chỉ hiện khi BUY/SELL)
+            # Box Setup Lệnh & Trade Ảo
             if final_sig != "NEUTRAL":
-                # Tính toán SL/TP
                 sl = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
                 
-                with setup_area.container():
+                with setup_placeholder.container():
                     st.markdown(f"""
-                    <div class="setup-box">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                            <span style="color:#aaa;">ENTRY</span>
-                            <span class="big-number" style="color:white;">${price:,.0f}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">
-                            <span style="color:#aaa;">STOP LOSS</span>
+                    <table class="trade-table">
+                        <tr>
+                            <td><span class="label-text">ENTRY</span><br><span class="value-text" style="color:white;">${price:,.1f}</span></td>
+                            <td><span class="label-text">STOP LOSS</span><br><span class="value-text" style="color:#FF4B4B;">${sl:,.1f}</span></td>
+                            <td><span class="label-text">TAKE PROFIT</span><br><span class="value-text" style="color:#00FF88;">${tp:,.1f}</span></td>
+                        </tr>
+                    </table>
+                    """, unsafe_allow_html=True)
+                
+                # Lưu log trade ảo
+                if is_auto_trade:
+                    if not st.session_state.trade_log or st.session_state.trade_log[0]['Price'] != f"${price:,.1f}":
+                        st.session_state.trade_log.insert(0, {
+                            "Time": datetime.now().strftime("%H:%M:%S"),
+                            "Side": final_sig,
+                            "Price": f"${price:,.1f}",
+                            "SL": f"${sl:,.1f}",
+                            "TP": f"${tp:,.1f}"
+                        })
+            else:
+                setup_placeholder.empty()
+
+            # Hiển thị bảng Trade Log
+            with log_placeholder.container():
+                if st.session_state.trade_log:
+                    st.dataframe(pd.DataFrame(st.session_state.trade_log).head(10), use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Chưa có lệnh nào được ghi nhận.")
+
+            time.sleep(60)
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Lỗi: {e}"); time.sleep(10)
+
+if __name__ == "__main__":
+    main()                       <span style="color:#aaa;">STOP LOSS</span>
                             <span class="big-number" style="color:#ff4b4b;">${sl:,.0f}</span>
                         </div>
                         <div style="display:flex; justify-content:space-between;">
@@ -384,6 +361,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
