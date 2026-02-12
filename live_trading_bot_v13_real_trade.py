@@ -46,31 +46,14 @@ def display_logic_gate(check_results, metrics):
         # Màu sắc: Xanh lân quang nếu Pass, Đỏ rực nếu Fail
         color = "#00FF41" if passed else "#FF0000"
         
-        # CSS chuẩn theo style box trên của bạn
-        box_html = f"""
-        <div style="
-            padding: 15px; 
-            border: 2px solid {color}; 
-            background: rgba(0, 30, 0, 0.4);
-            box-shadow: 0 0 15px {color}44;
-            text-align: center;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            font-family: 'Fira Code', monospace;
-        ">
-            <div style="color: {color}; font-size: 11px; text-shadow: 0 0 5px {color}; opacity: 0.8;">
-                [{label}]
-            </div>
-            <div style="color: white; font-size: 18px; font-weight: bold; margin: 8px 0;">
-                {metrics.get(label, 'N/A')}
-            </div>
-            <div style="color: {color}; font-size: 9px; letter-spacing: 1px;">
-                {">> PASS" if passed else ">> FAIL"}
-            </div>
-        </div>
-        """
         with cols[i]:
-            st.markdown(box_html, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="padding: 15px; border: 2px solid {color}; background: rgba(0, 30, 0, 0.4);box-shadow: 0 0 15px {color}44;text-align: center;border-radius: 8px;margin-bottom: 10px;font-family: 'Fira Code', monospace;">
+                <div style="color: {color}; font-size: 11px; text-shadow: 0 0 5px {color}; opacity: 0.8;">{label}</div>
+                <div style="color: white; font-size: 18px; font-weight: bold; margin: 8px 0;">{metrics.get(label, 'N/A')}</div>
+                <div style="color: {color}; font-size: 9px; letter-spacing: 1px;">{">> PASS" if passed else ">> FAIL"}</div>
+            </div>
+            """, unsafe_allow_html=True)
         
 # ════════════════════════════════════════════════════════════════════════════
 # 1. MODEL ARCHITECTURE
@@ -498,6 +481,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
