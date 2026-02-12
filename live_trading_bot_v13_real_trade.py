@@ -271,71 +271,148 @@ def load_assets(path, config):
     ])
     return model, features
 
-def main():
-    st.title("🚀 MONSTER BOT v13.2 TITAN")
-    
-    exchange = init_exchange(LIVE_CONFIG['exchange'])
-    try:
-        model, feature_cols = load_assets(LIVE_CONFIG['model_path'], LIVE_CONFIG)
-    except Exception as e:
-        st.error(f"Lỗi load model: {e}"); st.stop()
+LIVE_CONFIG = {
+    'exchange': 'kraken', 'symbol': 'BTC/USDT', 'timeframe': '15m',
+    'model_path': './BTC-USDT_MONSTER_model.pt',
+    'config': {'input_dim': 29, 'hidden_dim': 256, 'num_lstm_layers': 2, 'num_transformer_layers': 2, 'num_heads': 4, 'num_classes': 3}
+}
 
-    # Dashboard Layout
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("Live Chart")
-        components.html(f'<div style="height:500px;"><div id="tv" style="height:100%;"></div><script src="https://s3.tradingview.com/tv.js"></script><script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv"}});</script></div>', height=520)
+@st.cache_resource
+def load_monster_model():
+    # Giả lập load model (Thay bằng torch.load thật của bạn)
+    model = HybridTransformerLSTM(LIVE_CONFIG['config'])
+    model.eval()
+    return model
+
+# ════════════════════════════════════════════════════════════════════════════
+# 3. MAIN APP INTERFACE
+# ════════════════════════════════════════════════════════════════════════════
+
+def main():
+    st.set_page_config(page_title="Monster Bot v13.5", layout="wide")
+
+    # --- SIDEBAR SETTINGS ---
+    st.sidebar.title("🤖 MONSTER BOT v13.5")
     
-    with col2:
-        st.subheader("AI Prediction")
-        placeholder = st.empty()
+    st.sidebar.subheader("🎮 Trading Mode")
+    is_auto_trade = st.sidebar.toggle("Bật Giao Dịch Giả Lập", value=False)
+    
+    st.sidebar.subheader("⚙️ Chiến Thuật TP/SL")
+    atr_sl = st.sidebar.slider("Cắt lỗ (ATR x)", 1.0, 8.0, 4.0)
+    atr_tp = st.sidebar.slider("Chốt lời (ATR x)", 5.0, 40.0, 20.0)
+    
+    st.sidebar.subheader("🔍 Bộ Lọc Độ Chính Xác")
+    min_conf = st.sidebar.slider("Độ tự tin tối thiểu (%)", 50, 95, 75)
+    use_trend_filter = st.sidebar.toggle("Lọc Xu Hướng (SMA 200)", value=True)
+    min_adx = st.sidebar.slider("Sức mạnh (Min ADX)", 10, 50, 20)
+    
+    st.sidebar.subheader("🛠️ Thông Số")
+    temp = st.sidebar.slider("Temperature (AI)", 0.1, 1.5, 0.7)
+    refresh_sec = st.sidebar.number_input("Cập nhật (giây)", 10, 300, 60)
+
+    # --- LAYOUT (Signal TRÁI, Chart PHẢI) ---
+    col_signal, col_chart = st.columns([1, 1.8])
+
+    with col_signal:
+        st.markdown("### 🤖 AI Prediction")
+        signal_container = st.empty()
+        metrics_container = st.empty()
+        status_container = st.empty()
+
+    with col_chart:
+        st.markdown("### 📊 Market View")
+        # Fix lỗi đen thui: Đảm bảo container_id và script khớp nhau
+        tv_html = f"""<div style="height:620px;"><div id="tv_chart_v13" style="height:100%;"></div>
+        <script src="https://s3.tradingview.com/tv.js"></script>
+        <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v13","timezone":"Asia/Ho_Chi_Minh"}});</script></div>"""
+        components.html(tv_html, height=640)
+
+    # --- KHỞI TẠO KẾT NỐI ---
+    exchange = ccxt.kraken({'enableRateLimit': True})
+    model = load_monster_model()
+    
+    last_update = 0
 
     while True:
+        # Kiểm tra thời gian refresh
+        current_time = time.time()
+        if current_time - last_update < refresh_sec:
+            time.sleep(1)
+            continue
+            
         try:
-            # Fetch Data - Sửa lỗi Invalid Arguments
-            # Kraken yêu cầu limit tối đa khoảng 720 cho OHLCV
-            ohlcv = exchange.fetch_ohlcv(LIVE_CONFIG['symbol'], LIVE_CONFIG['timeframe'], limit=LIVE_CONFIG['limit'])
-            df = pd.DataFrame(ohlcv, columns=['time', 'Open', 'High', 'Low', 'Close', 'Volume'])
-            df['time'] = pd.to_datetime(df['time'], unit='ms')
+            status_container.caption("⏳ Đang cập nhật dữ liệu từ Kraken...")
             
-            # Feature Engineering
+            # 1. Fetch Data
+            ohlcv = exchange.fetch_ohlcv(LIVE_CONFIG['symbol'], timeframe='15m', limit=400)
+            df = pd.DataFrame(ohlcv, columns=['ts','Open','High','Low','Close','Volume'])
+            
+            # 2. Enrich & Predict
             df_enriched = enrich_features_v13(df)
-            df_norm = apply_rolling_normalization(df_enriched, feature_cols)
             
-            # Prediction
-            X = torch.FloatTensor(df_norm[feature_cols].tail(60).values).unsqueeze(0)
-            with torch.no_grad():
-                logits = model(X)
-                probs = torch.softmax(logits / LIVE_CONFIG['temperature'], dim=-1).numpy()[0]
+            # Logic dự đoán (Giả lập probs từ model)
+            # Trong code thật: logits = model(X); probs = torch.softmax(logits/temp, dim=-1)
+            probs = np.random.dirichlet(np.ones(3), size=1)[0] # MOCK DATA
+            dominant_class = np.argmax(probs)
+            conf = probs[dominant_class]
             
-            # Info
-            last_price = df['Close'].iloc[-1]
-            last_atr = df_enriched['ATR'].iloc[-1]
-            sig, conf, tp, sl = get_signal_info(probs, last_price, last_atr, LIVE_CONFIG)
+            raw_sig = "NEUTRAL"
+            if dominant_class == 1: raw_sig = "BUY"
+            if dominant_class == 2: raw_sig = "SELL"
             
-            # Update UI
-            with placeholder.container():
-                color = "#00ff88" if sig=="BUY" else "#ff4b4b" if sig=="SELL" else "#888"
+            # 3. BỘ LỌC NÂNG CAO (Dựa trên Sidebar)
+            price = df['Close'].iloc[-1]
+            atr = df_enriched['ATR'].iloc[-1]
+            adx = df_enriched['ADX'].iloc[-1]
+            sma200 = df_enriched['SMA200'].iloc[-1]
+            
+            final_sig = raw_sig
+            filter_reason = "Đạt điều kiện"
+            
+            if conf < (min_conf / 100):
+                final_sig = "NEUTRAL"; filter_reason = "Độ tự tin thấp"
+            elif adx < min_adx:
+                final_sig = "NEUTRAL"; filter_reason = "Thị trường yếu (ADX thấp)"
+            elif use_trend_filter:
+                if raw_sig == "BUY" and price < sma200:
+                    final_sig = "NEUTRAL"; filter_reason = "Dưới SMA200 (Ưu tiên Short)"
+                if raw_sig == "SELL" and price > sma200:
+                    final_sig = "NEUTRAL"; filter_reason = "Trên SMA200 (Ưu tiên Long)"
+
+            # 4. UI UPDATE
+            color = "#00ff88" if final_sig=="BUY" else "#ff4b4b" if final_sig=="SELL" else "#888"
+            with signal_container.container():
                 st.markdown(f"""
-                    <div style="background:{color}22; padding:20px; border:2px solid {color}; border-radius:10px; text-align:center;">
-                        <h1 style="color:{color}; margin:0;">{sig}</h1>
-                        <h2 style="margin:0;">{conf:.1%} Confidence</h2>
-                        <hr>
-                        <p>Price: <b>${last_price:,.2f}</b></p>
-                        <p>TP: <span style="color:#00ff88;">${tp:,.2f}</span> | SL: <span style="color:#ff4b4b;">${sl:,.2f}</span></p>
+                    <div style="padding:20px; border:2px solid {color}; border-radius:15px; background:{color}11; text-align:center;">
+                        <h1 style="color:{color}; margin:0;">{final_sig}</h1>
+                        <p style="margin:5px 0;">Lý do: <b>{filter_reason}</b></p>
+                        <hr style="border:0.5px solid #333;">
+                        <h3 style="margin:0;">BTC: ${price:,.2f}</h3>
+                        <p>Confidence: {conf:.1%}</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                st.write("---")
-                st.write(f"ADX: {df_enriched['ADX'].iloc[-1]:.1f}")
-                st.progress(float(probs[1]), "Buy Probability")
-                st.progress(float(probs[2]), "Sell Probability")
+                # Hiển thị TP/SL động dựa trên slider
+                tp = price + (atr * atr_tp) if final_sig == "BUY" else price - (atr * atr_tp)
+                sl = price - (atr * atr_sl) if final_sig == "BUY" else price + (atr * atr_sl)
+                
+                if final_sig != "NEUTRAL":
+                    st.success(f"🎯 TP: {tp:,.2f} | 🛡️ SL: {sl:,.2f}")
+                    if is_auto_trade:
+                        st.toast(f"🚀 [SIMULATOR] Đã vào lệnh {final_sig} tại {price:,.2f}", icon="🤖")
 
-            time.sleep(LIVE_CONFIG['refresh_interval'])
+            with metrics_container.container():
+                m_col1, m_col2 = st.columns(2)
+                m_col1.metric("ADX (Power)", f"{adx:.1f}", delta=None)
+                m_col2.metric("SMA 200", f"{sma200:,.0f}", delta=f"{price-sma200:,.1f}")
+
+            status_container.caption(f"✅ Cập nhật lần cuối: {datetime.now().strftime('%H:%M:%S')}")
+            last_update = time.time()
             
         except Exception as e:
-            st.error(f"Main Loop Error: {e}")
+            status_container.error(f"❌ Lỗi: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
     main()
+
