@@ -22,6 +22,14 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def backup_trade_log(new_entry):
+    file_name = "titan_audit_trail.csv"
+    df_new = pd.DataFrame([new_entry])
+    if not os.path.isfile(file_name):
+        df_new.to_csv(file_name, index=False)
+    else:
+        df_new.to_csv(file_name, mode='a', header=False, index=False)
+        
 # ════════════════════════════════════════════════════════════════════════════
 # 1. MODEL ARCHITECTURE
 # ════════════════════════════════════════════════════════════════════════════
@@ -209,7 +217,11 @@ def main():
     with st.sidebar.expander("EXTRACTION PROTOCOL", expanded=False):
         ui_atr_sl = st.slider("Hard Stop (ATR)", 1.0, 10.0, 4.0)
         ui_atr_tp = st.slider("Target Exit (ATR)", 5.0, 50.0, 20.0)
-    
+
+    with st.sidebar.expander("🛡️ ADVANCED EXIT PROTOCOL", expanded=True):
+        ui_use_profit_lock = st.toggle("Enable Profit Lock", value=True)
+        st.info("Lock Levels: 2.5%->0.5% | 5.0%->3.0% | 10%->7.0%")
+        
     if st.sidebar.button("TERMINATE LOGS"):
         st.session_state.trade_log = []
         st.rerun()
@@ -293,39 +305,76 @@ def main():
 
             # 5.2 Order Setup
             if final_sig != "NEUTRAL":
+                # Tính toán Stop Loss và Take Profit cơ bản
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
                 rr = abs(tp_val - price) / abs(price - sl_val)
                 
+                # --- THIẾT LẬP PROFIT LOCK LEVELS (BẬC THANG) ---
+                # Level 1: Lãi 2.5% -> Khóa 0.5%
+                l1_trigger = price * 1.025 if final_sig == "BUY" else price * 0.975
+                l1_lock = price * 1.005 if final_sig == "BUY" else price * 0.995
+                
+                # Level 2: Lãi 5.0% -> Khóa 3.0%
+                l2_trigger = price * 1.050 if final_sig == "BUY" else price * 0.950
+                l2_lock = price * 1.030 if final_sig == "BUY" else price * 0.970
+
                 with setup_placeholder.container():
                     st.markdown(f"""
                     <div class="trade-setup">
-                        <span style="color:#00FF88;">TARGET: {tp_val:,.1f}</span> | 
-                        <span style="color:#FF4B4B;">STOP: {sl_val:,.1f}</span> | 
-                        <span style="color:#FFFF00;">R/R: {rr:.1f}</span>
+                        <div style="margin-bottom: 8px;">
+                            <span style="color:#00FF88; font-weight:bold;">TARGET: {tp_val:,.1f}</span> | 
+                            <span style="color:#FF4B4B; font-weight:bold;">STOP: {sl_val:,.1f}</span> | 
+                            <span style="color:#FFFF00; font-weight:bold;">R/R: {rr:.1f}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #888; border-top: 1px solid #222; padding-top: 5px;">
+                            <span style="color:#00FF41;">[LOCK L1]</span> AT {l1_trigger:,.1f} → MOVE SL TO {l1_lock:,.1f}<br>
+                            <span style="color:#00FF41;">[LOCK L2]</span> AT {l2_trigger:,.1f} → MOVE SL TO {l2_lock:,.1f}
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
 
                 current_min = datetime.now().strftime("%H:%M")
                 if st.session_state.last_signal_time != current_min:
                     st.session_state.last_signal_time = current_min
-                    st.session_state.trade_log.insert(0, {
-                        "Timestamp": datetime.now().strftime("%H:%M:%S"),
+                    
+                    # Tạo entry mới cho Log
+                    new_entry = {
+                        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "Action": final_sig,
                         "Price": f"{price:,.1f}",
                         "Target": f"{tp_val:,.1f}",
                         "Stop": f"{sl_val:,.1f}",
+                        "L1_Lock": f"{l1_lock:,.1f}",
                         "RR": f"{rr:.1f}",
                         "AI%": f"{conf:.1%}"
-                    })
+                    }
+                    
+                    # 1. Cập nhật giao diện (Session State)
+                    st.session_state.trade_log.insert(0, new_entry)
+                    
+                    # 2. AUTO-BACKUP: Lưu ngay vào file CSV để tránh mất dữ liệu
+                    try:
+                        file_name = "titan_audit_trail.csv"
+                        df_backup = pd.DataFrame([new_entry])
+                        if not os.path.isfile(file_name):
+                            df_backup.to_csv(file_name, index=False)
+                        else:
+                            df_backup.to_csv(file_name, mode='a', header=False, index=False)
+                    except Exception as e:
+                        st.sidebar.error(f"Backup Error: {e}")
+                    
+                    # 3. Phát âm thanh cảnh báo
                     components.html("<script>playAlert();</script>", height=0)
             else:
                 setup_placeholder.empty()
 
-            # 5.3 Audit Log Refresh
+            # --- 5.3 AUDIT LOG REFRESH ---
             with log_placeholder.container():
                 if st.session_state.trade_log:
-                    st.dataframe(pd.DataFrame(st.session_state.trade_log).head(20), use_container_width=True, hide_index=True)
+                    # Hiển thị bảng log với các cột quan trọng nhất
+                    display_df = pd.DataFrame(st.session_state.trade_log).head(20)
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
             time.sleep(60)
             st.rerun()
@@ -336,8 +385,6 @@ def main():
 if __name__ == "__main__":
     main()
             
-if __name__ == "__main__":
-    main()
 
 
 
