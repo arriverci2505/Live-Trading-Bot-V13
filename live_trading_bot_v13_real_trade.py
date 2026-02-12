@@ -39,19 +39,19 @@ def send_telegram_msg(token, chat_id, message):
     except Exception as e:
         print(f"Telegram Error: {e}")
 
-def display_logic_checklist(conditions):
-    """Hiển thị danh sách các điều kiện kỹ thuật và trạng thái đạt/không đạt"""
-    st.markdown("<div class='crt-glow' style='font-size:14px; margin-top:10px;'>[LOGIC_GATE_MONITOR]</div>", unsafe_allow_html=True)
-    
-    cols = st.columns(len(conditions))
-    for i, (name, status) in enumerate(conditions.items()):
-        color = "#00FF41" if status else "#FF0000"
-        symbol = "✓" if status else "✗"
+def display_logic_gate(check_results, metrics):
+    """Hiển thị trạng thái các cổng logic kèm con số thực tế"""
+    cols = st.columns(len(check_results))
+    for i, (label, passed) in enumerate(check_results.items()):
+        color = "#00FF41" if passed else "#FF4444"
+        symbol = ">> PASS" if passed else ">> FAIL"
+        val = metrics.get(label, "")
         with cols[i]:
             st.markdown(f"""
-                <div style="border: 1px solid {color}; padding: 5px; border-radius: 3px; text-align: center;">
-                    <div style="color: {color}; font-size: 10px; font-family: 'Fira Code';">{name}</div>
-                    <div style="color: {color}; font-weight: bold;">{symbol}</div>
+                <div style="border: 1px solid {color}; padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.3); min-height: 80px;">
+                    <div style="color: {color}; font-size: 10px; font-family: 'Fira Code'; font-weight: bold; border-bottom: 1px solid {color}; margin-bottom: 5px;">{label}</div>
+                    <div style="color: #FFFFFF; font-size: 13px; font-family: 'Fira Code'; margin-bottom: 3px;">{val}</div>
+                    <div style="color: {color}; font-size: 11px; font-family: 'Fira Code';">{symbol}</div>
                 </div>
             """, unsafe_allow_html=True)
         
@@ -331,44 +331,53 @@ def main():
             elif p_sell > ui_sell_threshold: raw_sig = "SELL"
             
             # --- [XỬ LÝ LOGIC ĐIỀU KIỆN CHI TIẾT] ---
-            price = df['Close'].iloc[-1]
+price = df['Close'].iloc[-1]
             atr = df_enriched['ATR'].iloc[-1]
             adx = df_enriched['ADX'].iloc[-1]
             sma200 = df_enriched['SMA200'].iloc[-1]
+            rsi = df_enriched['RSI'].iloc[-1]
             
-            # 1. Kiểm tra xác suất AI (Confidence)
+            # Tính toán xác suất AI cụ thể
+            current_conf = max(p_buy, p_sell)
+            
+            # 1. Kiểm tra xác suất AI
             ai_pass = False
             if raw_sig == "BUY": ai_pass = p_buy > ui_buy_threshold
             elif raw_sig == "SELL": ai_pass = p_sell > ui_sell_threshold
             
-            # 2. Kiểm tra bộ lọc ADX (Trend Strength)
+            # 2. Kiểm tra bộ lọc ADX
             adx_pass = ui_adx_min <= adx <= ui_adx_max
             
-            # 3. Kiểm tra SMA200 (Trend Direction)
-            sma_pass = True # Mặc định Pass nếu không bật toggle
+            # 3. Kiểm tra SMA200
+            sma_pass = True
+            dist_to_sma = price - sma200
             if ui_use_dynamic:
                 if raw_sig == "BUY": sma_pass = price > sma200
                 elif raw_sig == "SELL": sma_pass = price < sma200
-                else: sma_pass = True
 
-            # Tổng hợp Checklist để hiển thị
+            # --- [LƯU CON SỐ CỤ THỂ VÀO DICTIONARY] ---
             gate_status = {
                 "AI_PROB": ai_pass,
-                "ADX_FLTR": adx_pass,
-                "SMA_BIAS": sma_pass
+                "ADX_LEVEL": adx_pass,
+                "SMA_TREND": sma_pass
+            }
+            
+            gate_metrics = {
+                "AI_PROB": f"{current_conf:.1%}",
+                "ADX_LEVEL": f"{adx:.2f}",
+                "SMA_TREND": f"{dist_to_sma:+.1f} pts"
             }
 
-            # Quyết định tín hiệu cuối cùng
+            # Quyết định tín hiệu
             if all(gate_status.values()) and raw_sig != "NEUTRAL":
                 final_sig = raw_sig
-                reason = "SYSTEM_READY_OPTIMAL"
+                reason = "READY"
             else:
                 final_sig = "NEUTRAL"
-                # Tìm lý do chính để báo cáo
-                if not ai_pass: reason = f"Low Confidence ({max(p_buy, p_sell):.1%})"
-                elif not adx_pass: reason = f"ADX Range Fail ({adx:.1f})"
-                elif not sma_pass: reason = "Trend/SMA Mismatch"
-                else: reason = "WAITING_FOR_SIGNAL"
+                if not ai_pass: reason = "Prob < Threshold"
+                elif not adx_pass: reason = "ADX Range Out"
+                elif not sma_pass: reason = "Wrong Side of SMA"
+                else: reason = "No Signal"
 
             # --- [5.1 CẬP NHẬT GIAO DIỆN HIỂN THỊ] ---
             sig_color = "#00FF41" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
@@ -390,7 +399,7 @@ def main():
                 """, unsafe_allow_html=True)
                 
                 # Gọi hàm hiển thị checklist ngay dưới card tín hiệu
-                display_logic_checklist(gate_status)
+                display_logic_gate(gate_status, gate_metrics)
 
             # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
             if final_sig != "NEUTRAL":
@@ -472,6 +481,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
