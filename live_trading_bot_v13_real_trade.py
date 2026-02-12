@@ -124,9 +124,10 @@ class HybridTransformerLSTM(nn.Module):
         self.input_dim = config['input_dim']
         self.hidden_dim = config['hidden_dim']
         self.num_classes = config['num_classes']
-
+        
         self.input_proj = nn.Linear(self.input_dim, self.hidden_dim)
-        self.pos_encoding = nn.Parameter(torch.zeros(1, 100, self.hidden_dim))
+        
+        self.pos_encoding = PositionalEncoding(self.hidden_dim)
         
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.hidden_dim,
@@ -135,18 +136,19 @@ class HybridTransformerLSTM(nn.Module):
             dropout=config['dropout'],
             batch_first=True
         )
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer,
-            num_layers=config['num_transformer_layers']
-        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=config['num_transformer_layers'])
         
         self.lstm = nn.LSTM(
             input_size=self.hidden_dim,
             hidden_size=self.hidden_dim,
             num_layers=config['num_lstm_layers'],
             batch_first=True,
-            bidirectional=True 
+            bidirectional=True
         )
+        
+        self.se_block = SEBlock(self.hidden_dim * 2, config['se_reduction_ratio'])
+        
+        self.final_attention = nn.MultiheadAttention(embed_dim=self.hidden_dim * 2, num_heads=config['num_heads'], batch_first=True)
         
         self.classifier = nn.Sequential(
             nn.Linear(self.hidden_dim * 2, self.hidden_dim),
@@ -157,10 +159,14 @@ class HybridTransformerLSTM(nn.Module):
 
     def forward(self, x):
         x = self.input_proj(x)
-        x = x + self.pos_encoding[:, :x.size(1), :]
+        x = self.pos_encoding(x)
         x = self.transformer(x)
         x, _ = self.lstm(x)
-        x = x[:, -1, :] 
+        
+        x = self.se_block(x)
+        attn_output, _ = self.final_attention(x, x, x)
+        
+        x = attn_output[:, -1, :]
         return self.classifier(x)
 # ════════════════════════════════════════════════════════════════════════════
 # 3. ADVANCED FEATURE ENGINEERING (v13)
@@ -911,5 +917,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
