@@ -38,6 +38,22 @@ def send_telegram_msg(token, chat_id, message):
         requests.post(url, json=payload, timeout=5)
     except Exception as e:
         print(f"Telegram Error: {e}")
+
+def display_logic_checklist(conditions):
+    """Hiển thị danh sách các điều kiện kỹ thuật và trạng thái đạt/không đạt"""
+    st.markdown("<div class='crt-glow' style='font-size:14px; margin-top:10px;'>[LOGIC_GATE_MONITOR]</div>", unsafe_allow_html=True)
+    
+    cols = st.columns(len(conditions))
+    for i, (name, status) in enumerate(conditions.items()):
+        color = "#00FF41" if status else "#FF0000"
+        symbol = "✓" if status else "✗"
+        with cols[i]:
+            st.markdown(f"""
+                <div style="border: 1px solid {color}; padding: 5px; border-radius: 3px; text-align: center;">
+                    <div style="color: {color}; font-size: 10px; font-family: 'Fira Code';">{name}</div>
+                    <div style="color: {color}; font-weight: bold;">{symbol}</div>
+                </div>
+            """, unsafe_allow_html=True)
         
 # ════════════════════════════════════════════════════════════════════════════
 # 1. MODEL ARCHITECTURE
@@ -314,26 +330,51 @@ def main():
             if p_buy > ui_buy_threshold: raw_sig = "BUY"
             elif p_sell > ui_sell_threshold: raw_sig = "SELL"
             
+            # --- [XỬ LÝ LOGIC ĐIỀU KIỆN CHI TIẾT] ---
             price = df['Close'].iloc[-1]
             atr = df_enriched['ATR'].iloc[-1]
             adx = df_enriched['ADX'].iloc[-1]
             sma200 = df_enriched['SMA200'].iloc[-1]
-            conf = max(p_buy, p_sell) if raw_sig != "NEUTRAL" else p_neutral
-
-            final_sig = raw_sig
-            reason = "OPTIMAL CONDITION"
             
-            if adx < ui_adx_min or adx > ui_adx_max:
-                final_sig = "NEUTRAL"; reason = f"Weak ADX ({adx:.1f})"
-            elif ui_use_dynamic:
-                if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Below SMA200"
-                if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200"
+            # 1. Kiểm tra xác suất AI (Confidence)
+            ai_pass = False
+            if raw_sig == "BUY": ai_pass = p_buy > ui_buy_threshold
+            elif raw_sig == "SELL": ai_pass = p_sell > ui_sell_threshold
+            
+            # 2. Kiểm tra bộ lọc ADX (Trend Strength)
+            adx_pass = ui_adx_min <= adx <= ui_adx_max
+            
+            # 3. Kiểm tra SMA200 (Trend Direction)
+            sma_pass = True # Mặc định Pass nếu không bật toggle
+            if ui_use_dynamic:
+                if raw_sig == "BUY": sma_pass = price > sma200
+                elif raw_sig == "SELL": sma_pass = price < sma200
+                else: sma_pass = True
 
-            # --- 5.1 SIGNAL VISUALIZATION (CRT GLOW EFFECT) ---
+            # Tổng hợp Checklist để hiển thị
+            gate_status = {
+                "AI_PROB": ai_pass,
+                "ADX_FLTR": adx_pass,
+                "SMA_BIAS": sma_pass
+            }
+
+            # Quyết định tín hiệu cuối cùng
+            if all(gate_status.values()) and raw_sig != "NEUTRAL":
+                final_sig = raw_sig
+                reason = "SYSTEM_READY_OPTIMAL"
+            else:
+                final_sig = "NEUTRAL"
+                # Tìm lý do chính để báo cáo
+                if not ai_pass: reason = f"Low Confidence ({max(p_buy, p_sell):.1%})"
+                elif not adx_pass: reason = f"ADX Range Fail ({adx:.1f})"
+                elif not sma_pass: reason = "Trend/SMA Mismatch"
+                else: reason = "WAITING_FOR_SIGNAL"
+
+            # --- [5.1 CẬP NHẬT GIAO DIỆN HIỂN THỊ] ---
             sig_color = "#00FF41" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
             glow_style = f"text-shadow: 0 0 20px {sig_color}, 0 0 30px {sig_color}; color: {sig_color} !important;"
-
-            bar_len = int(conf * 20) 
+            conf = max(p_buy, p_sell) if raw_sig != "NEUTRAL" else p_neutral
+            bar_len = int(conf * 20)
             signal_bar = "█" * bar_len + "░" * (20 - bar_len)
 
             with signal_placeholder.container():
@@ -344,9 +385,12 @@ def main():
                     <div class='crt-glow' style='font-size:12px; font-family: Courier New;'>
                         STRENGTH: [{signal_bar}] {conf:.1%}
                     </div>
-                    <div class='crt-glow' style='font-size:12px; opacity:0.6;'>STATUS: {reason}</div>
+                    <div class='crt-glow' style='font-size:12px; opacity:0.6; margin-bottom:10px;'>STATUS: {reason}</div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Gọi hàm hiển thị checklist ngay dưới card tín hiệu
+                display_logic_gate(gate_status)
 
             # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
             if final_sig != "NEUTRAL":
@@ -428,6 +472,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
