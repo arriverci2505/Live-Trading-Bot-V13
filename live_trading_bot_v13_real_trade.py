@@ -71,20 +71,17 @@ class HybridTransformerLSTM(nn.Module):
         return self.classifier(self.se_block(x)[:, -1, :])
 
 # ════════════════════════════════════════════════════════════════════════════
-# 2. FEATURE ENGINEERING (FIXED: Added SMA200)
+# 2. FEATURE ENGINEERING & NORMALIZATION
 # ════════════════════════════════════════════════════════════════════════════
 
 def enrich_features_v13(df):
     df = df.copy()
-    # Basic Features
     df['log_return'] = np.log(df['Close'] / df['Close'].shift(1))
     tr = pd.concat([df['High']-df['Low'], abs(df['High']-df['Close'].shift(1)), abs(df['Low']-df['Close'].shift(1))], axis=1).max(axis=1)
     df['ATR'] = tr.rolling(14).mean()
-    
-    # SMA 200 - Cần thiết cho bộ lọc xu hướng ở Sidebar
     df['SMA200'] = df['Close'].rolling(200).mean()
     
-    # ADX Calculation
+    # ADX Simple
     p = 14
     plus_dm = np.where((df['High'].diff() > df['Low'].shift(1)-df['Low']), np.maximum(df['High'].diff(), 0), 0)
     minus_dm = np.where((df['Low'].shift(1)-df['Low'] > df['High'].diff()), np.maximum(df['Low'].shift(1)-df['Low'], 0), 0)
@@ -93,11 +90,23 @@ def enrich_features_v13(df):
     df['ADX'] = (100 * abs(pdi-mdi)/(pdi+mdi)).rolling(p).mean()
     
     df['SMA_distance'] = (df['Close'].rolling(20).mean() - df['Close'].rolling(50).mean()) / df['Close'].rolling(50).mean()
+    
+    # Placeholder cho các Fourier và các cột khác để đủ 29 dims
+    for i in range(1, 6):
+        df[f'fourier_sin_{i}'] = np.sin(2 * np.pi * i * df.index / 100)
+        df[f'fourier_cos_{i}'] = np.cos(2 * np.pi * i * df.index / 100)
+    
+    df['BB_width'] = (df['Close'].rolling(20).mean() + 2*df['Close'].rolling(20).std()) - (df['Close'].rolling(20).mean() - 2*df['Close'].rolling(20).std())
+    df['BB_position'] = (df['Close'] - (df['Close'].rolling(20).mean() - 2*df['Close'].rolling(20).std())) / df['BB_width']
+    df['frac_diff_close'] = df['Close'].diff()
+    df['volume_imbalance'] = df['Volume'].diff()
+    df['entropy'] = df['Close'].rolling(10).std()
+    df['volume_ratio'] = df['Volume'] / df['Volume'].rolling(20).mean()
+
     df['regime_trending'] = (df['ADX'] > 25).astype(int)
     df['regime_uptrend'] = ((df['SMA_distance'] > 0) & (df['regime_trending'] == 1)).astype(int)
     df['regime_downtrend'] = ((df['SMA_distance'] < 0) & (df['regime_trending'] == 1)).astype(int)
     
-    # Indicators
     delta = df['Close'].diff()
     u = (delta.where(delta > 0, 0)).rolling(14).mean()
     d = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -112,68 +121,84 @@ def enrich_features_v13(df):
 
     return df.ffill().fillna(0)
 
+def apply_rolling_normalization(df, cols):
+    df_norm = df.copy()
+    for col in cols:
+        if col in df_norm.columns:
+            mean = df_norm[col].rolling(window=100, min_periods=1).mean()
+            std = df_norm[col].rolling(window=100, min_periods=1).std()
+            df_norm[col] = (df_norm[col] - mean) / (std + 1e-8)
+    return df_norm.fillna(0)
+
 # ════════════════════════════════════════════════════════════════════════════
 # 3. MAIN INTERFACE & LOGIC
 # ════════════════════════════════════════════════════════════════════════════
 
+# THÊM CÁC KEY THIẾU VÀO LIVE_CONFIG
 LIVE_CONFIG = {
-    'exchange': 'kraken', 'symbol': 'BTC/USDT', 'timeframe': '15m',
+    'exchange': 'kraken', 
+    'symbol': 'BTC/USDT', 
+    'timeframe': '15m',
+    'sequence_length': 30,
+    'atr_multiplier_sl': 4.0,
+    'atr_multiplier_tp': 20.0,
+    'adx_threshold_trending': 25,
+    'temperature': 0.7,
+    'refresh_interval': 60,
     'config': {'input_dim': 29, 'hidden_dim': 256, 'num_lstm_layers': 2, 'num_transformer_layers': 2, 'num_heads': 4, 'num_classes': 3}
 }
 
 @st.cache_resource
 def load_monster_model():
     model = HybridTransformerLSTM(LIVE_CONFIG['config'])
+    # Trong thực tế bạn sẽ load weight ở đây: model.load_state_dict(torch.load('path.pt'))
     model.eval()
     return model
 
 def main():
     st.set_page_config(page_title="MONSTER BOT v13.2 TITAN", layout="wide")
 
-    # --- 1. SIDEBAR SETTINGS (Bảng điều khiển) ---
+    # --- 1. SIDEBAR SETTINGS ---
     st.sidebar.title("🤖 MONSTER BOT v13")
     
     st.sidebar.subheader("🎮 Trading Mode")
     is_auto_trade = st.sidebar.toggle("Bật Giao Dịch Giả Lập", value=False)
     
     st.sidebar.subheader("⚙️ Chiến Thuật TP/SL")
-    # Lấy giá trị từ LIVE_CONFIG làm mặc định
-    ui_atr_sl = st.sidebar.slider("Cắt lỗ (ATR x)", 1.0, 8.0, LIVE_CONFIG['atr_multiplier_sl'])
-    ui_atr_tp = st.sidebar.slider("Chốt lời (ATR x)", 5.0, 40.0, LIVE_CONFIG['atr_multiplier_tp'])
+    ui_atr_sl = st.sidebar.slider("Cắt lỗ (ATR x)", 1.0, 8.0, float(LIVE_CONFIG['atr_multiplier_sl']))
+    ui_atr_tp = st.sidebar.slider("Chốt lời (ATR x)", 5.0, 40.0, float(LIVE_CONFIG['atr_multiplier_tp']))
     
     st.sidebar.subheader("🔍 Bộ Lọc Độ Chính Xác")
     ui_min_conf = st.sidebar.slider("Độ tự tin tối thiểu (%)", 50, 95, 75)
     ui_use_trend = st.sidebar.toggle("Lọc Xu Hướng (SMA 200)", value=True)
-    ui_min_adx = st.sidebar.slider("Sức mạnh (Min ADX)", 10, 50, LIVE_CONFIG['adx_threshold_trending'])
+    ui_min_adx = st.sidebar.slider("Sức mạnh (Min ADX)", 10, 50, int(LIVE_CONFIG['adx_threshold_trending']))
     
     st.sidebar.subheader("🛠️ Thông Số AI")
-    ui_temp = st.sidebar.slider("Temperature", 0.1, 1.5, LIVE_CONFIG['temperature'])
-    ui_refresh = st.sidebar.number_input("Cập nhật (giây)", 10, 300, LIVE_CONFIG['refresh_interval'])
+    ui_temp = st.sidebar.slider("Temperature", 0.1, 1.5, float(LIVE_CONFIG['temperature']))
+    ui_refresh = st.sidebar.number_input("Cập nhật (giây)", 10, 300, int(LIVE_CONFIG['refresh_interval']))
 
-    # --- 2. LAYOUT (Phân bổ màn hình) ---
+    # --- 2. LAYOUT ---
     col_left, col_right = st.columns([1, 1.8])
 
     with col_left:
         st.markdown("### 🤖 AI Prediction")
-        signal_container = st.empty()     # Box BUY/SELL
-        metrics_container = st.empty()   # Các chỉ số ADX, RSI, Price
-        trade_log_container = st.empty() # Nhật ký lệnh ảo
-        status_container = st.empty()    # Trạng thái cập nhật
+        signal_container = st.empty()
+        metrics_container = st.empty()
+        trade_log_container = st.empty()
+        status_container = st.empty()
 
     with col_right:
         st.markdown("### 📊 Market View")
-        # TradingView Widget
         tv_html = f"""<div style="height:620px;"><div id="tv_chart_v13" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
         <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v13","timezone":"Asia/Ho_Chi_Minh"}});</script></div>"""
         components.html(tv_html, height=640)
 
-    # --- 3. KHỞI TẠO (Sử dụng đúng hàm load_monster_model) ---
+    # --- 3. KHỞI TẠO ---
     try:
         model = load_monster_model()
         exchange = ccxt.kraken({'enableRateLimit': True})
         
-        # Danh sách features cố định theo model của bạn
         feature_cols = [
             'log_return', 'ATR', 'BB_width', 'BB_position', 'frac_diff_close',
             'fourier_sin_1', 'fourier_sin_2', 'fourier_sin_3', 'fourier_sin_4', 'fourier_sin_5',
@@ -200,33 +225,28 @@ def main():
             continue
             
         try:
-            status_container.caption("⏳ Đang quét tín hiệu từ Kraken...")
+            status_container.caption("⏳ Đang quét tín hiệu...")
             
-            # 4.1 Fetch & Process Data
             ohlcv = exchange.fetch_ohlcv(LIVE_CONFIG['symbol'], timeframe='15m', limit=400)
             df = pd.DataFrame(ohlcv, columns=['ts','Open','High','Low','Close','Volume'])
             df_enriched = enrich_features_v13(df)
             df_norm = apply_rolling_normalization(df_enriched, feature_cols)
             
-            # 4.2 AI Prediction
             X_last = df_norm[feature_cols].tail(LIVE_CONFIG['sequence_length']).values
             X_tensor = torch.FloatTensor(X_last).unsqueeze(0)
             
             with torch.no_grad():
                 logits = model(X_tensor)
-                # Sử dụng Temperature từ Sidebar
                 probs = torch.softmax(logits / ui_temp, dim=-1).numpy()[0]
             
             conf = np.max(probs)
             raw_idx = np.argmax(probs)
             raw_sig = "BUY" if raw_idx == 1 else "SELL" if raw_idx == 2 else "NEUTRAL"
             
-            # 4.3 Sidebar Filters & Logic
             price = df['Close'].iloc[-1]
             atr = df_enriched['ATR'].iloc[-1]
             adx_val = df_enriched['ADX'].iloc[-1]
-            # Tính SMA200 để lọc xu hướng
-            sma200 = df['Close'].rolling(200).mean().iloc[-1]
+            sma200 = df_enriched['SMA200'].iloc[-1]
             
             final_sig = raw_sig
             reason = "✅ Tín hiệu AI xác nhận"
@@ -236,12 +256,10 @@ def main():
             elif adx_val < ui_min_adx:
                 final_sig = "NEUTRAL"; reason = f"❌ ADX yếu ({adx_val:.1f})"
             elif ui_use_trend:
-                if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "❌ Chặn BUY (Dưới SMA200)"
-                if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "❌ Chặn SELL (Trên SMA200)"
+                if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "❌ BUY dưới SMA200"
+                if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "❌ SELL trên SMA200"
 
-            # --- 5. HIỂN THỊ LÊN MÀN HÌNH ---
-            
-            # A. Box Tín hiệu khổng lồ
+            # --- 5. HIỂN THỊ ---
             color = "#00ff88" if final_sig == "BUY" else "#ff4b4b" if final_sig == "SELL" else "#888888"
             bg = "rgba(0, 255, 136, 0.1)" if final_sig == "BUY" else "rgba(255, 75, 75, 0.1)" if final_sig == "SELL" else "rgba(136, 136, 136, 0.1)"
             
@@ -249,24 +267,21 @@ def main():
                 st.markdown(f"""
                     <div style="background:{bg}; border:2px solid {color}; padding:25px; border-radius:15px; text-align:center;">
                         <h1 style="color:{color}; font-size:55px; margin:0;">{final_sig}</h1>
-                        <p style="margin:5px 0; opacity:0.8; font-size:18px;">{reason}</p>
+                        <p style="margin:5px 0; opacity:0.8;">{reason}</p>
                     </div>
                 """, unsafe_allow_html=True)
 
-            # B. Chỉ số Metrics
             with metrics_container.container():
                 st.write("")
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Giá BTC", f"${price:,.2f}")
-                m2.metric("ADX (Sức mạnh)", f"{adx_val:.1f}")
+                m2.metric("ADX", f"{adx_val:.1f}")
                 m3.metric("AI Confidence", f"{conf:.1%}")
 
-            # C. Nhật ký Trade ảo
             if is_auto_trade and final_sig != "NEUTRAL":
                 if not st.session_state.trade_log or st.session_state.trade_log[0]['Price'] != f"${price:,.2f}":
                     tp = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
                     sl = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
-                    
                     st.session_state.trade_log.insert(0, {
                         "Time": datetime.now().strftime("%H:%M:%S"),
                         "Signal": final_sig,
@@ -274,14 +289,14 @@ def main():
                         "TP": f"${tp:,.1f}",
                         "SL": f"${sl:,.1f}"
                     })
-                    st.toast(f"🚀 Kích hoạt lệnh {final_sig} ảo!", icon="🤖")
+                    st.toast(f"🚀 Lệnh {final_sig} kích hoạt!", icon="🤖")
 
             with trade_log_container.container():
                 st.markdown("#### 📜 Recent Signals")
                 if st.session_state.trade_log:
                     st.table(pd.DataFrame(st.session_state.trade_log).head(5))
 
-            status_container.caption(f"✅ Cập nhật lần cuối: {datetime.now().strftime('%H:%M:%S')}")
+            status_container.caption(f"✅ Update: {datetime.now().strftime('%H:%M:%S')}")
             last_update = current_time
             
         except Exception as e:
@@ -290,7 +305,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
