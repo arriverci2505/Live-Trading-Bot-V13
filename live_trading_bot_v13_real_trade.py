@@ -390,7 +390,7 @@ def main():
                 """, unsafe_allow_html=True)
                 
                 # Gọi hàm hiển thị checklist ngay dưới card tín hiệu
-                display_logic_gate(gate_status)
+                display_logic_checklist(gate_status)
 
             # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
             if final_sig != "NEUTRAL":
@@ -472,6 +472,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
