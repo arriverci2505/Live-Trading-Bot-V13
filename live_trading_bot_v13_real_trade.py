@@ -331,7 +331,7 @@ def main():
             elif p_sell > ui_sell_threshold: raw_sig = "SELL"
             
             # --- [XỬ LÝ LOGIC ĐIỀU KIỆN CHI TIẾT] ---
-price = df['Close'].iloc[-1]
+            price = df['Close'].iloc[-1]
             atr = df_enriched['ATR'].iloc[-1]
             adx = df_enriched['ADX'].iloc[-1]
             sma200 = df_enriched['SMA200'].iloc[-1]
@@ -481,6 +481,7 @@ price = df['Close'].iloc[-1]
 if __name__ == "__main__":
     main()
             
+
 
 
 
