@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 LIVE_CONFIG = {
     # Exchange & Symbol
-    'exchange': 'binance',           # binance, kraken, etc.
+    'exchange': 'kraken',           
     'symbol': 'BTC/USDT',
     'timeframe': '15m',
     'limit': 500,                    # Enough for EMA 200 + rolling window
@@ -917,6 +917,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
