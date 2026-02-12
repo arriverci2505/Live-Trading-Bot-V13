@@ -161,52 +161,24 @@ def main():
     # --- 1. INTELLIGENCE TERMINAL CSS ---
     st.markdown("""
         <style>
-        /* Import font chữ hacker chuyên dụng */
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-
-        .stApp { 
-            background-color: #050505; 
-            font-family: 'JetBrains Mono', monospace; 
-        }
-
-        /* Hiệu ứng chữ phát sáng (Neon Glow) */
+        .stApp { background-color: #050505; font-family: 'JetBrains Mono', monospace; }
         .glow-text {
-            color: #00FF41; /* Màu xanh Matrix */
+            color: #00FF41; 
             text-shadow: 0 0 5px #00FF41, 0 0 10px #00FF41;
             font-family: 'JetBrains Mono', monospace;
         }
-
-        /* Box Tín hiệu phong cách tình báo */
         .signal-card { 
-            padding: 20px; 
-            border-radius: 5px; 
-            text-align: center; 
-            border: 1px solid #00FF41;
-            background: rgba(0, 255, 65, 0.05);
-            box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.2);
-            margin-bottom: 15px;
+            padding: 20px; border-radius: 5px; text-align: center; 
+            border: 1px solid #00FF41; background: rgba(0, 255, 65, 0.05);
+            box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.2); margin-bottom: 15px;
         }
-
-        /* Bảng Log phong cách mã lệnh */
         [data-testid="stDataFrame"] { 
             border: 1px solid #333; 
-            filter: brightness(0.8) sepia(1) hue-rotate(70deg); /* Ép toàn bộ bảng sang màu xanh */
+            filter: brightness(0.8) sepia(1) hue-rotate(70deg); 
         }
-
-        /* Chỉnh lại font cho Sidebar và các Header */
-        h1, h2, h3, p, span, label {
-            font-family: 'JetBrains Mono', monospace !important;
-            color: #00FF41 !important;
-        }
-
-        .trade-setup {
-            background: #000;
-            border: 1px dashed #00FF41;
-            padding: 10px;
-            font-size: 14px;
-        }
-        
-        /* Loại bỏ các đường kẻ thừa của Streamlit để giao diện sạch hơn */
+        h1, h2, h3, p, span, label { font-family: 'JetBrains Mono', monospace !important; color: #00FF41 !important; }
+        .trade-setup { background: #000; border: 1px dashed #00FF41; padding: 10px; font-size: 14px; text-align: center; }
         hr { border: 0.5px solid #111; }
         </style>
         
@@ -230,7 +202,8 @@ def main():
         ui_sell_threshold = st.slider("Sell Limit", 0.3, 0.8, 0.45)
 
     with st.sidebar.expander("REGIME ANALYSIS", expanded=True):
-        ui_adx_min = st.slider("Min Volatility", 10, 50, 25)
+        ui_adx_min = st.slider("Min ADX", 10, 50, 20)
+        ui_adx_max = st.slider("Max ADX", 50, 100, 100) # ĐÃ THÊM BIẾN NÀY ĐỂ HẾT LỖI
         ui_use_dynamic = st.toggle("SMA Filter", value=True)
 
     with st.sidebar.expander("EXTRACTION PROTOCOL", expanded=False):
@@ -253,7 +226,6 @@ def main():
 
     with col_right:
         st.markdown("<h3 class='glow-text'>> LIVE_SATELLITE_FEED</h3>", unsafe_allow_html=True)
-        # Ép TradingView sang theme Dark nhất có thể
         tv_html = f"""<div style="height:750px; border: 1px solid #00FF41; border-radius:5px; overflow:hidden; filter: grayscale(1) contrast(1.2) brightness(0.8) sepia(1) hue-rotate(70deg);">
         <div id="tv_chart_v15" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
@@ -304,23 +276,22 @@ def main():
             if adx < ui_adx_min or adx > ui_adx_max:
                 final_sig = "NEUTRAL"; reason = f"Weak ADX ({adx:.1f})"
             elif ui_use_dynamic:
-                if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Below SMA200 (Bearish)"
-                if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200 (Bullish)"
+                if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Below SMA200"
+                if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200"
 
-            # 5.1 Signal Visualization
-            color = "#00FF00" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
-            bg = f"rgba({255 if final_sig=='SELL' else 0}, {255 if final_sig=='BUY' else 0 if final_sig=='SELL' else 255}, 0, 0.1)"
-
+            # 5.1 Signal Visualization (Đã sửa lỗi HTML lặp)
+            sig_color = "#00FF41" if final_sig == "BUY" else "#FF3131" if final_sig == "SELL" else "#FFD700"
+            
             with signal_placeholder.container():
                 st.markdown(f"""
-                <div class='signal-card'><h1 class='glow-text'>{final_sig}
-                    <h1 style="color:{color}; margin:0; font-size:50px; letter-spacing:2px;">{final_sig}</h1>
-                    <p style="color:white; margin-top:5px; font-weight:bold;">BTC: $ {price:,.1f} | AI CONF: {conf:.1%}</p>
-                    <p style="color:#aaa; font-size:14px; margin:0; text-transform:uppercase;">{reason}</p>
+                <div class='signal-card'>
+                    <h1 class='glow-text' style='color:{sig_color} !important; font-size:45px;'>{final_sig}</h1>
+                    <p style='font-weight:bold;'>PRICE: $ {price:,.1f} | CONF: {conf:.1%}</p>
+                    <p style='color:#666 !important; font-size:12px;'>STATUS: {reason}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # 5.2 Order Setup & Audit Log
+            # 5.2 Order Setup
             if final_sig != "NEUTRAL":
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
@@ -329,9 +300,9 @@ def main():
                 with setup_placeholder.container():
                     st.markdown(f"""
                     <div class="trade-setup">
-                        <span style="color:#00FF88; font-weight:bold;">TP: $ {tp_val:,.1f}</span> | 
-                        <span style="color:#FF4B4B; font-weight:bold;">SL: $ {sl_val:,.1f}</span> | 
-                        <span style="color:#FFFF00; font-weight:bold;">R:R: 1:{rr:.1f}</span>
+                        <span style="color:#00FF88;">TARGET: {tp_val:,.1f}</span> | 
+                        <span style="color:#FF4B4B;">STOP: {sl_val:,.1f}</span> | 
+                        <span style="color:#FFFF00;">R/R: {rr:.1f}</span>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -342,10 +313,10 @@ def main():
                         "Timestamp": datetime.now().strftime("%H:%M:%S"),
                         "Action": final_sig,
                         "Price": f"{price:,.1f}",
-                        "TP": f"{tp_val:,.1f}",
-                        "SL": f"{sl_val:,.1f}",
-                        "R:R": f"1:{rr:.1f}",
-                        "Conf": f"{conf:.1%}"
+                        "Target": f"{tp_val:,.1f}",
+                        "Stop": f"{sl_val:,.1f}",
+                        "RR": f"{rr:.1f}",
+                        "AI%": f"{conf:.1%}"
                     })
                     components.html("<script>playAlert();</script>", height=0)
             else:
@@ -367,6 +338,7 @@ if __name__ == "__main__":
             
 if __name__ == "__main__":
     main()
+
 
 
 
