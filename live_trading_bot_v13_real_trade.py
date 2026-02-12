@@ -169,96 +169,89 @@ def main():
     # --- 1. VINTAGE TERMINAL CSS (FIXED OVERLAP & FONT) ---
     st.markdown("""
         <style>
-        /* Font chữ đặc trưng máy tính đời cũ: Courier New, Lucida Console hoặc Monospace */
-        .terminal-font {
-            font-family: 'Courier New', Courier, monospace !important;
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+        
+        .stApp { background-color: #030a03; }
+
+        /* Hiệu ứng chữ lân quang phát sáng (CRT Effect) */
+        .crt-glow {
             color: #00FF41 !important;
-            text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+            font-family: 'Fira Code', monospace !important;
+            text-shadow: 
+                0 0 2px rgba(0, 255, 65, 0.8),
+                0 0 10px rgba(0, 255, 65, 0.5),
+                0 0 15px rgba(0, 255, 65, 0.3);
+            letter-spacing: 2px;
+        }
+
+        /* Card tín hiệu phong cách màn hình radar */
+        .signal-card { 
+            padding: 30px; 
+            border: 3px solid #00FF41; 
+            background: rgba(0, 40, 0, 0.3);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2), inset 0 0 20px rgba(0, 255, 65, 0.1);
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* Trade Setup: Kiểu dòng lệnh Command Prompt */
+        .trade-setup { 
+            background: #000; border-left: 5px solid #00FF41; 
+            padding: 15px; margin-top: 10px;
+            font-family: 'Fira Code', monospace;
+            color: #00FF41;
+            line-height: 1.6;
+        }
+
+        /* Sidebar Fix: Không cho phát sáng ở đây để tránh trùng chữ */
+        [data-testid="stSidebar"] {
+            background-color: #020502 !important;
+            border-right: 1px solid #004400;
         }
         
-        .stApp { background-color: #050505; }
-
-        /* Card tín hiệu: Font thô, to, rõ ràng */
-        .signal-card { 
-            padding: 25px; border: 2px solid #00FF41; 
-            background: black;
-            text-align: center;
-            margin-bottom: 15px;
-            font-family: 'Courier New', Courier, monospace;
-        }
-
-        /* Trade Setup: Kiểu dòng lệnh (Command Line) */
-        .trade-setup { 
-            background: #000; border: 1px dashed #00FF41; 
-            padding: 12px; font-size: 14px; text-align: left;
-            font-family: 'Courier New', Courier, monospace;
-            color: #00FF41;
-        }
-
-        /* Tùy chỉnh Sidebar: Chữ tiêu đề màu xanh, nhưng label thanh trượt để mặc định tránh trùng */
-        .sidebar-header {
-            color: #00FF41;
-            font-family: 'Courier New', Courier, monospace;
-            font-weight: bold;
-            border-bottom: 1px solid #00FF41;
-            margin-bottom: 10px;
-        }
-
-        /* Bảng log: Ép về font máy tính cũ */
-        [data-testid="stDataFrame"] * {
-            font-family: 'Courier New', Courier, monospace !important;
-            font-size: 12px !important;
-        }
-
-        /* Fix lỗi trùng chữ ở thanh trượt */
-        .stSlider [data-testid="stWidgetLabel"] p {
-            color: #888 !important; /* Trả lại màu xám để không bị lóa và trùng */
+        .stSlider label, .stToggle label, [data-testid="stExpander"] p {
+            color: #008800 !important; /* Màu xanh lá tối để không bị lóa */
+            font-family: 'Fira Code', monospace !important;
             text-shadow: none !important;
         }
-        </style>
-        
-        <audio id="audio-alert">
-          <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-        </audio>
-        <script>
-        function playAlert() {
-          var audio = document.getElementById("audio-alert");
-          if (audio) { audio.play(); }
+
+        /* Bảng log DataFrame */
+        [data-testid="stDataFrame"] {
+            border: 1px solid #004400;
+            filter: sepia(100%) hue-rotate(70deg) brightness(90%) contrast(110%);
         }
-        </script>
+        
+        hr { border: 0.5px solid #003300; }
+        </style>
     """, unsafe_allow_html=True)
-
-    # --- 2. SIDEBAR ---
-    st.sidebar.markdown("<div class='sidebar-header'>ACCESS_PROTOCOL</div>", unsafe_allow_html=True)
     
-    with st.sidebar.expander("CORE_PARAMS", expanded=True):
+    # --- 2. SIDEBAR ---
+    st.sidebar.markdown("<h2 class='crt-glow' style='font-size:20px;'>CORE_INTERFACE</h2>", unsafe_allow_html=True)
+    
+    with st.sidebar.expander("OPERATIONAL_PARAMS", expanded=True):
         ui_temp = st.slider("Signal_Temp", 0.1, 1.5, 0.5)
-        ui_buy_threshold = st.slider("Buy_Limit", 0.3, 0.8, 0.45)
-        ui_sell_threshold = st.slider("Sell_Limit", 0.3, 0.8, 0.45)
+        ui_buy_threshold = st.slider("Buy_Threshold", 0.3, 0.8, 0.45)
+        ui_sell_threshold = st.slider("Sell_Threshold", 0.3, 0.8, 0.45)
 
-    with st.sidebar.expander("REGIME_ANALYSIS", expanded=True):
-        ui_adx_min = st.slider("Min_ADX", 10, 50, 20)
-        ui_adx_max = st.slider("Max_ADX", 50, 100, 100)
-        ui_use_dynamic = st.toggle("SMA_Filter", value=True)
-
-    with st.sidebar.expander("EXIT_PROTOCOL", expanded=True):
-        ui_atr_sl = st.slider("Hard_Stop (ATR)", 1.0, 10.0, 4.0)
-        ui_atr_tp = st.slider("Target_Exit (ATR)", 5.0, 50.0, 20.0)
+    with st.sidebar.expander("RADAR_CONFIG", expanded=True):
+        ui_adx_min = st.slider("Min_ADX_Level", 10, 50, 20)
+        ui_adx_max = st.slider("Max_ADX_Level", 50, 100, 100)
+        ui_use_dynamic = st.toggle("Activate_SMA_Filter", value=True)
 
     # --- 3. MAIN LAYOUT ---
     col_left, col_right = st.columns([1.2, 1.8])
 
     with col_left:
-        st.markdown("<div class='terminal-font' style='font-size:16px;'>[SYSTEM]: AI_ANALYSIS_STREAM</div>", unsafe_allow_html=True)
+        st.markdown("<div class='crt-glow' style='font-size:16px;'>[ANALYSIS_STREAM_ON]</div>", unsafe_allow_html=True)
         signal_placeholder = st.empty()
         setup_placeholder = st.empty()
-        st.markdown("<div class='terminal-font' style='font-size:16px; margin-top:20px;'>[SYSTEM]: AUDIT_TRAIL_LOG</div>", unsafe_allow_html=True)
+        st.markdown("<div class='crt-glow' style='font-size:16px; margin-top:20px;'>[HISTORICAL_AUDIT_LOG]</div>", unsafe_allow_html=True)
         log_placeholder = st.empty()
 
     with col_right:
-        st.markdown("<div class='terminal-font' style='font-size:16px;'>[VIEW]: LIVE_SATELLITE_FEED</div>", unsafe_allow_html=True)
-        # Giữ biểu đồ TradingView đen trắng cho đúng chất cổ điển
-        tv_html = f"""<div style="height:750px; border: 1px solid #00FF41; overflow:hidden; filter: grayscale(1) brightness(0.7) contrast(1.2);">
+        st.markdown("<div class='crt-glow' style='font-size:16px;'>[SATELLITE_FEED_ACTIVE]</div>", unsafe_allow_html=True)
+        tv_html = f"""<div style="height:750px; border: 2px solid #004400; border-radius:5px; overflow:hidden; filter: brightness(0.7) contrast(1.5) sepia(100%) hue-rotate(70deg);">
         <div id="tv_chart_v15" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
         <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v15","style":"1","enable_publishing":false,"hide_side_toolbar":false,"allow_symbol_change":true}});</script></div>"""
@@ -312,15 +305,15 @@ def main():
                 if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200"
 
             # 5.1 Signal Visualization (Fixed Overlap)
-            sig_color = "#00FF41" if final_sig == "BUY" else "#FF3131" if final_sig == "SELL" else "#FFD700"
-            
+            sig_color = "#00FF41" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
+            glow_style = f"text-shadow: 0 0 20px {sig_color}, 0 0 30px {sig_color}; color: {sig_color} !important;"
+
             with signal_placeholder.container():
                 st.markdown(f"""
-                <div class='signal-card'>
-                    <div style='color:{sig_color}; font-size:50px; font-weight:bold; letter-spacing:5px;'>{final_sig}</div>
-                    <div class='terminal-font' style='font-size:18px; color:white !important;'>DATA_ENTRY: ${price:,.1f}</div>
-                    <div class='terminal-font' style='font-size:14px; color:#555 !important;'>CONFIDENCE_LEVEL: {conf:.1%}</div>
-                    <div class='terminal-font' style='font-size:12px; color:#555 !important;'>REASON: {reason}</div>
+                <div class='signal-card' style='border-color: {sig_color};'>
+                    <div style='{glow_style} font-size:60px; font-weight:bold; font-family:Fira Code;'>{final_sig}</div>
+                    <div class='crt-glow' style='font-size:20px; color:white !important;'>UNIT_PRICE: ${price:,.1f}</div>
+                    <div class='crt-glow' style='font-size:14px; opacity:0.7;'>CONFIDENCE_LEVEL: {conf:.1%}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -333,9 +326,9 @@ def main():
                 with setup_placeholder.container():
                     st.markdown(f"""
                     <div class="trade-setup">
-                        <div class="terminal-font">> TARGET_PRICE: {tp_val:,.1f}</div>
-                        <div class="terminal-font">> STOP_LOSS:    {sl_val:,.1f}</div>
-                        <div class="terminal-font">> RISK_REWARD:  1:{rr:.1f}</div>
+                        <div class="crt-glow">> INITIATING_TARGET: {tp_val:,.1f}</div>
+                        <div class="crt-glow">> STOP_LOSS_LIMIT:  {sl_val:,.1f}</div>
+                        <div class="crt-glow">> RISK_REWARD_RATIO: 1:{rr:.1f}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -375,6 +368,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
