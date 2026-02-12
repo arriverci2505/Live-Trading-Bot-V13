@@ -55,6 +55,18 @@ LIVE_CONFIG = {
     'rolling_window': 200,           # Rolling Z-score window
     'rolling_min_periods': 50,
     
+    'config': {
+        'input_dim': 29,         # SỬA TỪ 30 THÀNH 29
+        'hidden_dim': 256,       # SỬA TỪ 128 THÀNH 256
+        'num_lstm_layers': 2,
+        'num_transformer_layers': 2,
+        'num_heads': 4,
+        'se_reduction_ratio': 16,
+        'dropout': 0.35,
+        'num_classes': 3,
+        'use_positional_encoding': True,
+    }
+    
     # Market Regime
     'adx_threshold_trending': 25,
     'adx_threshold_ranging': 20,
@@ -112,17 +124,10 @@ class HybridTransformerLSTM(nn.Module):
         self.input_dim = config['input_dim']
         self.hidden_dim = config['hidden_dim']
         self.num_classes = config['num_classes']
+
+        self.input_proj = nn.Linear(self.input_dim, self.hidden_dim)
+        self.pos_encoding = nn.Parameter(torch.zeros(1, 100, self.hidden_dim))
         
-        # Embedding
-        self.input_projection = nn.Linear(self.input_dim, self.hidden_dim)
-        
-        # Positional Encoding
-        if config.get('use_positional_encoding', True):
-            self.pos_encoder = PositionalEncoding(self.hidden_dim)
-        else:
-            self.pos_encoder = None
-        
-        # Transformer Encoder
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.hidden_dim,
             nhead=config['num_heads'],
@@ -130,53 +135,33 @@ class HybridTransformerLSTM(nn.Module):
             dropout=config['dropout'],
             batch_first=True
         )
-        self.transformer_encoder = nn.TransformerEncoder(
+        self.transformer = nn.TransformerEncoder(
             encoder_layer,
             num_layers=config['num_transformer_layers']
         )
         
-        # LSTM
         self.lstm = nn.LSTM(
             input_size=self.hidden_dim,
             hidden_size=self.hidden_dim,
             num_layers=config['num_lstm_layers'],
             batch_first=True,
-            dropout=config['dropout'] if config['num_lstm_layers'] > 1 else 0
+            bidirectional=True 
         )
         
-        # SE Block
-        self.se_block = SEBlock(self.hidden_dim, config['se_reduction_ratio'])
-        
-        # Classification Head
-        self.fc = nn.Linear(self.hidden_dim, self.num_classes)
-        self.dropout = nn.Dropout(config['dropout'])
+        self.classifier = nn.Sequential(
+            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(config['dropout']),
+            nn.Linear(self.hidden_dim, self.num_classes)
+        )
 
     def forward(self, x):
-        # Projection
-        x = self.input_projection(x)
-        
-        # Positional Encoding
-        if self.pos_encoder is not None:
-            x = self.pos_encoder(x)
-        
-        # Transformer
-        x = self.transformer_encoder(x)
-        
-        # LSTM
+        x = self.input_proj(x)
+        x = x + self.pos_encoding[:, :x.size(1), :]
+        x = self.transformer(x)
         x, _ = self.lstm(x)
-        
-        # SE Block
-        x = self.se_block(x)
-        
-        # Take last timestep
-        x = x[:, -1, :]
-        
-        # Classification
-        x = self.dropout(x)
-        x = self.fc(x)
-        
-        return x
-
+        x = x[:, -1, :] 
+        return self.classifier(x)
 # ════════════════════════════════════════════════════════════════════════════
 # 3. ADVANCED FEATURE ENGINEERING (v13)
 # ════════════════════════════════════════════════════════════════════════════
@@ -926,3 +911,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
