@@ -164,94 +164,106 @@ def load_monster_model():
     return model
 
 def main():
-    st.set_page_config(page_title="TITAN INTEL TERMINAL v15.6", layout="wide")
+    st.set_page_config(page_title="TITAN INTEL TERMINAL v15.8", layout="wide")
 
-    # --- 1. VINTAGE TERMINAL CSS (FIXED OVERLAP & FONT) ---
+    # --- 1. VINTAGE TERMINAL CSS (FIXED OVERLAP & ENHANCED GLOW) ---
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
         
         .stApp { background-color: #030a03; }
 
-        /* Hiệu ứng chữ lân quang phát sáng (CRT Effect) */
+        /* Hiệu ứng chữ lân quang phát sáng - CRT EFFECT */
         .crt-glow {
             color: #00FF41 !important;
             font-family: 'Fira Code', monospace !important;
             text-shadow: 
-                0 0 2px rgba(0, 255, 65, 0.8),
-                0 0 10px rgba(0, 255, 65, 0.5),
-                0 0 15px rgba(0, 255, 65, 0.3);
-            letter-spacing: 2px;
+                0 0 5px rgba(0, 255, 65, 1),
+                0 0 10px rgba(0, 255, 65, 0.6);
+            letter-spacing: 1px;
         }
 
-        /* Card tín hiệu phong cách màn hình radar */
+        /* Card tín hiệu: Radar Style */
         .signal-card { 
-            padding: 30px; 
-            border: 3px solid #00FF41; 
-            background: rgba(0, 40, 0, 0.3);
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2), inset 0 0 20px rgba(0, 255, 65, 0.1);
+            padding: 25px; 
+            border: 2px solid #00FF41; 
+            background: rgba(0, 30, 0, 0.4);
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
             text-align: center;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
         }
 
-        /* Trade Setup: Kiểu dòng lệnh Command Prompt */
+        /* Trade Setup: Command Prompt Style */
         .trade-setup { 
-            background: #000; border-left: 5px solid #00FF41; 
-            padding: 15px; margin-top: 10px;
+            background: #000; border-left: 4px solid #00FF41; 
+            padding: 12px; margin-top: 10px;
             font-family: 'Fira Code', monospace;
             color: #00FF41;
-            line-height: 1.6;
         }
 
-        /* Sidebar Fix: Không cho phát sáng ở đây để tránh trùng chữ */
+        /* Sidebar: QUAN TRỌNG - Sửa lỗi trùng chữ */
         [data-testid="stSidebar"] {
-            background-color: #020502 !important;
+            background-color: #010801 !important;
             border-right: 1px solid #004400;
         }
         
-        .stSlider label, .stToggle label, [data-testid="stExpander"] p {
-            color: #008800 !important; /* Màu xanh lá tối để không bị lóa */
+        /* Chỉ định rõ ràng màu nhãn để không bị CSS khác đè lên */
+        .stSlider label, .stToggle label, .stSelectbox label, [data-testid="stWidgetLabel"] p {
+            color: #008800 !important; 
             font-family: 'Fira Code', monospace !important;
+            font-size: 13px !important;
             text-shadow: none !important;
         }
 
-        /* Bảng log DataFrame */
+        /* Bảng log */
         [data-testid="stDataFrame"] {
-            border: 1px solid #004400;
-            filter: sepia(100%) hue-rotate(70deg) brightness(90%) contrast(110%);
+            border: 1px solid #003300;
+            filter: sepia(100%) hue-rotate(80deg) brightness(85%);
         }
         
-        hr { border: 0.5px solid #003300; }
+        hr { border: 0.5px solid #002200; }
         </style>
     """, unsafe_allow_html=True)
+
+    # --- 2. SIDEBAR (ĐỦ 4 PHẦN SETTING) ---
+    st.sidebar.markdown("<h2 class='crt-glow' style='font-size:22px;'>TERMINAL_CONFIG</h2>", unsafe_allow_html=True)
     
-    # --- 2. SIDEBAR ---
-    st.sidebar.markdown("<h2 class='crt-glow' style='font-size:20px;'>CORE_INTERFACE</h2>", unsafe_allow_html=True)
-    
-    with st.sidebar.expander("OPERATIONAL_PARAMS", expanded=True):
+    # Mục 1: AI core
+    with st.sidebar.expander("🤖 OPERATIONAL_PARAMS", expanded=True):
         ui_temp = st.slider("Signal_Temp", 0.1, 1.5, 0.5)
         ui_buy_threshold = st.slider("Buy_Threshold", 0.3, 0.8, 0.45)
         ui_sell_threshold = st.slider("Sell_Threshold", 0.3, 0.8, 0.45)
 
-    with st.sidebar.expander("RADAR_CONFIG", expanded=True):
+    # Mục 2: Market Filter
+    with st.sidebar.expander("📡 RADAR_FILTERS", expanded=True):
         ui_adx_min = st.slider("Min_ADX_Level", 10, 50, 20)
         ui_adx_max = st.slider("Max_ADX_Level", 50, 100, 100)
         ui_use_dynamic = st.toggle("Activate_SMA_Filter", value=True)
+
+    # Mục 3: Risk Management (PHẦN BỊ THIẾU 1)
+    with st.sidebar.expander("⚖️ EXTRACTION_PROTOCOL", expanded=True):
+        ui_atr_sl = st.slider("Hard_Stop (ATR)", 1.0, 10.0, 4.0)
+        ui_atr_tp = st.slider("Target_Exit (ATR)", 5.0, 50.0, 20.0)
+
+    # Mục 4: Advanced Exit (PHẦN BỊ THIẾU 2)
+    with st.sidebar.expander("🛡️ ADVANCED_EXIT", expanded=True):
+        ui_use_profit_lock = st.toggle("Enable_Profit_Lock", value=True)
+        st.sidebar.caption("Auto-Move SL: 2.5% -> 0.5% | 5% -> 3%")
 
     # --- 3. MAIN LAYOUT ---
     col_left, col_right = st.columns([1.2, 1.8])
 
     with col_left:
-        st.markdown("<div class='crt-glow' style='font-size:16px;'>[ANALYSIS_STREAM_ON]</div>", unsafe_allow_html=True)
+        st.markdown("<div class='crt-glow' style='font-size:16px;'>[STATUS: ANALYZING...]</div>", unsafe_allow_html=True)
         signal_placeholder = st.empty()
         setup_placeholder = st.empty()
         st.markdown("<div class='crt-glow' style='font-size:16px; margin-top:20px;'>[HISTORICAL_AUDIT_LOG]</div>", unsafe_allow_html=True)
         log_placeholder = st.empty()
 
     with col_right:
-        st.markdown("<div class='crt-glow' style='font-size:16px;'>[SATELLITE_FEED_ACTIVE]</div>", unsafe_allow_html=True)
-        tv_html = f"""<div style="height:750px; border: 2px solid #004400; border-radius:5px; overflow:hidden; filter: brightness(0.7) contrast(1.5) sepia(100%) hue-rotate(70deg);">
+        st.markdown("<div class='crt-glow' style='font-size:16px;'>[LIVE_SATELLITE_FEED]</div>", unsafe_allow_html=True)
+        tv_html = f"""<div style="height:750px; border: 2px solid #004400; border-radius:5px; overflow:hidden; filter: brightness(0.7) contrast(1.2) sepia(100%) hue-rotate(70deg);">
         <div id="tv_chart_v15" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
         <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v15","style":"1","enable_publishing":false,"hide_side_toolbar":false,"allow_symbol_change":true}});</script></div>"""
@@ -368,6 +380,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
