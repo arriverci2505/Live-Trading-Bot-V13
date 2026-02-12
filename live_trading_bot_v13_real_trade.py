@@ -324,43 +324,8 @@ def main():
             st.error(f"Lỗi: {e}"); time.sleep(10)
 
 if __name__ == "__main__":
-    main()                       <span style="color:#aaa;">STOP LOSS</span>
-                            <span class="big-number" style="color:#ff4b4b;">${sl:,.0f}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between;">
-                            <span style="color:#aaa;">TAKE PROFIT</span>
-                            <span class="big-number" style="color:#00ff88;">${tp:,.0f}</span>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                setup_area.empty() # Xóa box setup nếu đang Neutral
-
-            # 5.4 Hiển thị Checklist (Lý do/Bộ lọc)
-            with checklist_area.container():
-                # Tạo icon check/cross
-                conf_icon = "✅" if is_conf_ok else "❌"
-                trend_icon = "✅" if is_trend_ok else "❌"
-                adx_icon = "✅" if adx >= 20 else "⚠️"
-                
-                st.markdown("### 📋 Điều Kiện Vào Lệnh")
-                st.markdown(f"""
-                * **AI Dự đoán:** {raw_idx} ({conf:.0%}) {conf_icon}
-                * **Xu hướng (SMA200):** {'Thuận' if is_trend_ok else 'Ngược'} {trend_icon}
-                * **Sức mạnh (ADX):** {adx:.1f} {adx_icon}
-                """)
-                
-                if final_sig == "NEUTRAL":
-                    st.info(f"💡 **Trạng thái:** {status_msg}. Hãy kiên nhẫn chờ.")
-
-            last_update = current_time
-            
-        except Exception as e:
-            st.error(f"Lỗi vòng lặp: {e}")
-            time.sleep(5)
-
-if __name__ == "__main__":
     main()
+
 
 
 
