@@ -316,7 +316,7 @@ def main():
                 if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Below SMA200"
                 if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Above SMA200"
 
-            # 5.1 Signal Visualization (Fixed Overlap)
+# --- 5.1 SIGNAL VISUALIZATION (CRT GLOW EFFECT) ---
             sig_color = "#00FF41" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
             glow_style = f"text-shadow: 0 0 20px {sig_color}, 0 0 30px {sig_color}; color: {sig_color} !important;"
 
@@ -325,11 +325,11 @@ def main():
                 <div class='signal-card' style='border-color: {sig_color};'>
                     <div style='{glow_style} font-size:60px; font-weight:bold; font-family:Fira Code;'>{final_sig}</div>
                     <div class='crt-glow' style='font-size:20px; color:white !important;'>UNIT_PRICE: ${price:,.1f}</div>
-                    <div class='crt-glow' style='font-size:14px; opacity:0.7;'>CONFIDENCE_LEVEL: {conf:.1%}</div>
+                    <div class='crt-glow' style='font-size:14px; opacity:0.7;'>CONFIDENCE_LEVEL: {conf:.1% | STATUS: {reason}}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # --- 5.2 ORDER SETUP & ADVANCED EXIT ---
+            # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
             if final_sig != "NEUTRAL":
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
@@ -344,6 +344,7 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
 
+                # Chặn trùng lặp log trong cùng 1 phút
                 current_min = datetime.now().strftime("%H:%M")
                 if st.session_state.last_signal_time != current_min:
                     st.session_state.last_signal_time = current_min
@@ -357,29 +358,47 @@ def main():
                     }
                     st.session_state.trade_log.insert(0, new_entry)
                     
-                    # Auto-Backup CSV
+                    # Auto-Backup ra file CSV để ko mất dữ liệu khi tắt bot
                     try:
                         file_name = "titan_audit_trail.csv"
                         pd.DataFrame([new_entry]).to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False)
                     except: pass
                     
+                    # Âm thanh cảnh báo
                     components.html("<script>playAlert();</script>", height=0)
             else:
                 setup_placeholder.empty()
 
+            # --- 5.3 DASHBOARD ANALYTICS (PHẦN MỚI THÊM CHO TIỆN) ---
             with log_placeholder.container():
                 if st.session_state.trade_log:
-                    st.dataframe(pd.DataFrame(st.session_state.trade_log).head(15), use_container_width=True, hide_index=True)
+                    df_log = pd.DataFrame(st.session_state.trade_log)
+                    
+                    # Bảng thống kê mini phía trên Log
+                    cols = st.columns(3)
+                    cols[0].metric("TOTAL_SCAN", len(df_log))
+                    cols[1].metric("LAST_ACTION", final_sig)
+                    cols[2].metric("SYSTEM_UPTIME", datetime.now().strftime("%H:%M"))
 
+                    # Hiển thị bảng Log chính
+                    st.dataframe(
+                        df_log.head(15), 
+                        use_container_width=True, 
+                        hide_index=True
+                    )
+
+            # --- VÒNG LẶP CHỜ QUÉT LẦN TIẾP THEO ---
             time.sleep(60)
             st.rerun()
 
         except Exception as e:
-            st.error(f"System Error: {e}"); time.sleep(10)
+            st.error(f"SYSTEM CRITICAL ERROR: {e}")
+            time.sleep(10)
 
 if __name__ == "__main__":
     main()
             
+
 
 
 
