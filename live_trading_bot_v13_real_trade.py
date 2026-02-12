@@ -40,20 +40,37 @@ def send_telegram_msg(token, chat_id, message):
         print(f"Telegram Error: {e}")
 
 def display_logic_gate(check_results, metrics):
-    """Hiển thị trạng thái các cổng logic kèm con số thực tế"""
+    """Hiển thị thông số với viền phát sáng (Glow) chuẩn style Titan"""
     cols = st.columns(len(check_results))
     for i, (label, passed) in enumerate(check_results.items()):
-        color = "#00FF41" if passed else "#FF4444"
-        symbol = ">> PASS" if passed else ">> FAIL"
-        val = metrics.get(label, "")
+        # Màu sắc: Xanh lân quang nếu Pass, Đỏ rực nếu Fail
+        color = "#00FF41" if passed else "#FF0000"
+        
+        # CSS chuẩn theo style box trên của bạn
+        box_html = f"""
+        <div style="
+            padding: 15px; 
+            border: 2px solid {color}; 
+            background: rgba(0, 30, 0, 0.4);
+            box-shadow: 0 0 15px {color}44;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-family: 'Fira Code', monospace;
+        ">
+            <div style="color: {color}; font-size: 11px; text-shadow: 0 0 5px {color}; opacity: 0.8;">
+                [{label}]
+            </div>
+            <div style="color: white; font-size: 18px; font-weight: bold; margin: 8px 0;">
+                {metrics.get(label, 'N/A')}
+            </div>
+            <div style="color: {color}; font-size: 9px; letter-spacing: 1px;">
+                {">> PASS" if passed else ">> FAIL"}
+            </div>
+        </div>
+        """
         with cols[i]:
-            st.markdown(f"""
-                <div style="border: 1px solid {color}; padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.3); min-height: 80px;">
-                    <div style="color: {color}; font-size: 10px; font-family: 'Fira Code'; font-weight: bold; border-bottom: 1px solid {color}; margin-bottom: 5px;">{label}</div>
-                    <div style="color: #FFFFFF; font-size: 13px; font-family: 'Fira Code'; margin-bottom: 3px;">{val}</div>
-                    <div style="color: {color}; font-size: 11px; font-family: 'Fira Code';">{symbol}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(box_html, unsafe_allow_html=True)
         
 # ════════════════════════════════════════════════════════════════════════════
 # 1. MODEL ARCHITECTURE
@@ -359,13 +376,13 @@ def main():
             gate_status = {
                 "AI_PROB": ai_pass,
                 "ADX_LEVEL": adx_pass,
-                "SMA_TREND": sma_pass
+                "SMA_BIAS": sma_pass
             }
             
             gate_metrics = {
-                "AI_PROB": f"{current_conf:.1%}",
-                "ADX_LEVEL": f"{adx:.2f}",
-                "SMA_TREND": f"{dist_to_sma:+.1f} pts"
+                "AI_PROB": f"{max(p_buy, p_sell):.1%}",
+                "ADX_LEVEL": f"{df_enriched['ADX'].iloc[-1]:.1f}",
+                "SMA_BIAS": f"{ (df['Close'].iloc[-1] - df_enriched['SMA200'].iloc[-1]):+.1f}"
             }
 
             # Quyết định tín hiệu
@@ -481,6 +498,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
