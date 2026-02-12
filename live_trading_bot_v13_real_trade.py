@@ -44,9 +44,9 @@ LIVE_CONFIG = {
     'timeframe': '15m',
     'limit': 500,                    # Enough for EMA 200 + rolling window
     
-    # Model Paths
-    'model_path': './models/BTC-USDT_MONSTER_model.pt',
-    'feature_cols_path': './models/BTC-USDT_feature_cols.txt',
+    # Model Path (checkpoint chứa cả config và feature_cols)
+    
+    'model_path': './BTC-USDT_MONSTER_model.pt',
     
     # v13 Settings
     'sequence_length': 60,
