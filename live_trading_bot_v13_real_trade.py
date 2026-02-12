@@ -158,6 +158,29 @@ def load_monster_model():
 def main():
     st.set_page_config(page_title="MONSTER BOT v13.8 TITAN", layout="wide")
 
+    # --- CSS CỰC MẠNH ĐỂ TẠO VIỀN (BORDER) RÕ NÉT ---
+    st.markdown("""
+        <style>
+        /* Tạo viền cho các ô Metric */
+        [data-testid="stMetric"] {
+            border: 2px solid #444444 !important;
+            padding: 15px !important;
+            border-radius: 10px !important;
+            background-color: #0E1117 !important;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5) !important;
+        }
+        /* Hiệu ứng khi di chuột qua ô chỉ số */
+        [data-testid="stMetric"]:hover {
+            border-color: #888888 !important;
+        }
+        /* Chỉnh font số cho to và rõ */
+        [data-testid="stMetricValue"] {
+            font-size: 28px !important;
+            font-weight: bold !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # --- 1. SIDEBAR SETTINGS ---
     st.sidebar.title("🤖 MONSTER BOT v13")
     
@@ -183,20 +206,20 @@ def main():
     with col_left:
         st.markdown("### 🤖 AI Prediction & Technicals")
         signal_container = st.empty()     # Box BUY/SELL/NEUTRAL
-        st.markdown("---")
-        metrics_container = st.empty()   # Khu vực chứa rất nhiều thông số
-        st.markdown("---")
+        st.write("") # Tạo khoảng hở
+        metrics_container = st.empty()   # Khu vực chứa 9 thông số có viền
+        st.write("")
         trade_log_container = st.empty() # Nhật ký
         status_container = st.empty()
 
     with col_right:
         st.markdown("### 📊 Live Market Analysis")
-        tv_html = f"""<div style="height:750px; border-radius:15px; overflow:hidden; border: 1px solid #333;"><div id="tv_chart_v13" style="height:100%;"></div>
+        tv_html = f"""<div style="height:750px; border-radius:15px; overflow:hidden; border: 2px solid #444;"><div id="tv_chart_v13" style="height:100%;"></div>
         <script src="https://s3.tradingview.com/tv.js"></script>
         <script>new TradingView.widget({{"autosize":true,"symbol":"KRAKEN:BTCUSDT","interval":"15","theme":"dark","container_id":"tv_chart_v13","timezone":"Asia/Ho_Chi_Minh","style":"1","toolbar_bg":"#f1f3f6","enable_publishing":false,"hide_side_toolbar":false,"allow_symbol_change":true,"details":true,"hotlist":true,"calendar":true}});</script></div>"""
         components.html(tv_html, height=760)
 
-    # --- 3. KHỞI TẠO ---
+    # --- 3. KHỞI TẠO (Phần này giữ nguyên code cũ của bạn) ---
     try:
         model = load_monster_model()
         exchange = ccxt.kraken({'enableRateLimit': True})
@@ -260,44 +283,46 @@ def main():
                 if raw_sig == "BUY" and price < sma200: final_sig = "NEUTRAL"; reason = "Dưới SMA200 (Ưu tiên Sell)"
                 if raw_sig == "SELL" and price > sma200: final_sig = "NEUTRAL"; reason = "Trên SMA200 (Ưu tiên Buy)"
 
-            # --- 5. HIỂN THỊ CẢI TIẾN ---
+            # --- 5. HIỂN THỊ VỚI VIỀN ĐẬM ---
             
-            # Cấu hình màu sắc theo yêu cầu
             if final_sig == "BUY":
                 color, bg, icon = "#00FF00", "rgba(0, 255, 0, 0.15)", "🚀"
+                border_style = "4px solid #00FF00"
             elif final_sig == "SELL":
                 color, bg, icon = "#FF0000", "rgba(255, 0, 0, 0.15)", "🔥"
+                border_style = "4px solid #FF0000"
             else: # NEUTRAL
-                color, bg, icon = "#FFFF00", "rgba(255, 255, 0, 0.1)", "⚖️" # Màu Vàng
+                color, bg, icon = "#FFFF00", "rgba(255, 255, 0, 0.1)", "⚖️"
+                border_style = "4px solid #FFFF00" # Viền vàng cực đậm cho Neutral
 
             with signal_container.container():
                 st.markdown(f"""
-                    <div style="background:{bg}; border:2px solid {color}; padding:25px; border-radius:15px; text-align:center;">
-                        <h1 style="color:{color}; font-size:65px; margin:0; text-shadow: 0 0 10px {color};">{icon} {final_sig}</h1>
-                        <p style="color:white; font-size:20px; font-weight:bold; margin-top:10px;">{reason}</p>
+                    <div style="background:{bg}; border:{border_style}; padding:25px; border-radius:15px; text-align:center; box-shadow: 0 0 20px {color}44;">
+                        <h1 style="color:{color}; font-size:70px; margin:0; text-shadow: 2px 2px 10px rgba(0,0,0,0.5);">{icon} {final_sig}</h1>
+                        <p style="color:white; font-size:22px; font-weight:bold; margin-top:10px;">{reason}</p>
                     </div>
                 """, unsafe_allow_html=True)
 
             with metrics_container.container():
-                # Dòng 1: Giá và AI
+                # Dòng 1: Viền các ô Metric đã được điều chỉnh bằng CSS ở trên
                 r1_c1, r1_c2, r1_c3 = st.columns(3)
                 r1_c1.metric("Giá Hiện Tại", f"${price:,.2f}")
                 r1_c2.metric("AI Confidence", f"{conf:.2%}")
-                r1_c3.metric("ATR (Biến động)", f"{atr:.2f}")
+                r1_c3.metric("ATR Volatility", f"{atr:.2f}")
 
-                # Dòng 2: Kỹ thuật chi tiết
+                # Dòng 2
                 r2_c1, r2_c2, r2_c3 = st.columns(3)
-                r2_c1.metric("RSI (14)", f"{rsi_val:.1f}", delta="Quá mua" if rsi_val>70 else "Quá bán" if rsi_val<30 else None, delta_color="inverse")
+                r2_c1.metric("RSI (14)", f"{rsi_val:.1f}")
                 r2_c2.metric("ADX Strength", f"{adx_val:.1f}")
-                r2_c3.metric("MACD", f"{macd_val:.4f}")
+                r2_c3.metric("MACD Raw", f"{macd_val:.4f}")
 
-                # Dòng 3: Xu hướng dài hạn
+                # Dòng 3
                 r3_c1, r3_c2, r3_c3 = st.columns(3)
-                r3_c1.metric("SMA 200", f"${sma200:,.1f}")
-                r3_c2.metric("Cách SMA200", f"{dist_sma:.2f}%")
+                r3_c1.metric("SMA 200 Line", f"${sma200:,.1f}")
+                r3_c2.metric("SMA Distance", f"{dist_sma:.2f}%")
                 r3_c3.metric("Vol. Z-Score", f"{volatility:.2f}")
 
-            # Xử lý Nhật ký
+            # (Phần xử lý Nhật ký giữ nguyên vì đã ok)
             if is_auto_trade and final_sig != "NEUTRAL":
                 if not st.session_state.trade_log or st.session_state.trade_log[0]['Price'] != f"${price:,.1f}":
                     tp = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
@@ -310,20 +335,20 @@ def main():
                         "SL": f"${sl:,.1f}",
                         "Conf": f"{conf:.1%}"
                     })
-                    st.toast(f"Đã ghi nhận lệnh {final_sig}", icon="📝")
 
             with trade_log_container.container():
                 if st.session_state.trade_log:
-                    st.markdown("#### 📜 Trade Log History")
+                    st.markdown("#### 📜 Live Trade Log")
                     st.table(pd.DataFrame(st.session_state.trade_log).head(5))
 
             status_container.caption(f"✅ Last scan: {datetime.now().strftime('%H:%M:%S')}")
             last_update = current_time
             
         except Exception as e:
-            status_container.error(f"Lỗi hệ thống: {e}"); time.sleep(10)
+            status_container.error(f"Lỗi: {e}"); time.sleep(10)
 
 if __name__ == "__main__":
     main()
+
 
 
