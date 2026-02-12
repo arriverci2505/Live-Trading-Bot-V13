@@ -16,6 +16,7 @@ from datetime import datetime
 from scipy import signal as scipy_signal
 import warnings
 import logging
+import requests
 
 # Cấu hình log và cảnh báo
 warnings.filterwarnings('ignore')
@@ -29,6 +30,14 @@ def backup_trade_log(new_entry):
         df_new.to_csv(file_name, index=False)
     else:
         df_new.to_csv(file_name, mode='a', header=False, index=False)
+
+def send_telegram_msg(token, chat_id, message):
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"Telegram Error: {e}")
         
 # ════════════════════════════════════════════════════════════════════════════
 # 1. MODEL ARCHITECTURE
@@ -250,7 +259,11 @@ def main():
     with st.sidebar.expander("🛡️ ADVANCED_EXIT", expanded=True):
         ui_use_profit_lock = st.toggle("Enable_Profit_Lock", value=True)
         st.sidebar.caption("Auto-Move SL: 2.5% -> 0.5% | 5% -> 3%")
-
+    
+    with st.sidebar.expander("📡 TELEGRAM LINK (COMMUNICATION)", expanded=False):
+        tg_token = st.text_input("Bot Token", type="password")
+        tg_chat_id = st.text_input("Your Chat ID")
+        st.caption("Bot sẽ báo động khi có lệnh BUY/SELL")
     # --- 3. MAIN LAYOUT ---
     col_left, col_right = st.columns([1.2, 1.8])
 
@@ -320,14 +333,18 @@ def main():
             sig_color = "#00FF41" if final_sig == "BUY" else "#FF0000" if final_sig == "SELL" else "#FFFF00"
             glow_style = f"text-shadow: 0 0 20px {sig_color}, 0 0 30px {sig_color}; color: {sig_color} !important;"
 
+            bar_len = int(conf * 20) 
+            signal_bar = "█" * bar_len + "░" * (20 - bar_len)
+
             with signal_placeholder.container():
                 st.markdown(f"""
                 <div class='signal-card' style='border-color: {sig_color};'>
                     <div style='{glow_style} font-size:60px; font-weight:bold; font-family:Fira Code;'>{final_sig}</div>
                     <div class='crt-glow' style='font-size:20px; color:white !important;'>UNIT_PRICE: ${price:,.1f}</div>
-                    <div class='crt-glow' style='font-size:14px; opacity:0.7;'>
-                        CONFIDENCE: {conf:.1%} | STATUS: {reason}
+                    <div class='crt-glow' style='font-size:12px; font-family: Courier New;'>
+                        STRENGTH: [{signal_bar}] {conf:.1%}
                     </div>
+                    <div class='crt-glow' style='font-size:12px; opacity:0.6;'>STATUS: {reason}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -336,7 +353,7 @@ def main():
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
                 rr = abs(tp_val - price) / abs(price - sl_val)
-                
+
                 with setup_placeholder.container():
                     st.markdown(f"""
                     <div class="trade-setup">
@@ -360,6 +377,17 @@ def main():
                     }
                     st.session_state.trade_log.insert(0, new_entry)
                     
+                    if tg_token and tg_chat_id:
+                        alert_text = (
+                            f"🚀 *TITAN SIGNAL DETECTED*\n"
+                            f"━━━━━━━━━━━━━━━\n"
+                            f"🎯 *ACTION:* {final_sig}\n"
+                            f"💰 *PRICE:* ${price:,.1f}\n"
+                            f"📊 *CONFIDENCE:* {conf:.1%}\n"
+                            f"🛡️ *TP:* {tp_val:,.1f} | *SL:* {sl_val:,.1f}\n"
+                            f"⏰ *TIME:* {datetime.now().strftime('%H:%M:%S')}"
+                        )
+                        send_telegram_msg(tg_token, tg_chat_id, alert_text)
                     # Auto-Backup ra file CSV để ko mất dữ liệu khi tắt bot
                     try:
                         file_name = "titan_audit_trail.csv"
@@ -400,6 +428,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
