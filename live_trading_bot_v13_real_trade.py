@@ -828,9 +828,7 @@ def main():
             sell_threshold = 0.50
             
             # Determine signal
-            signal, confidence, dominant_class = determine_signal(
-                probs_np, buy_threshold, sell_threshold
-            )
+            signal, confidence, probs = predict_v13(model, df, feature_cols, LIVE_CONFIG)
             
             # Get current market data
             current_price = df['Close'].iloc[-1]
@@ -952,6 +950,7 @@ def main():
 # ════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     main()
+
 
 
 
