@@ -256,20 +256,20 @@ def main():
     
     # Mục 1: AI core
     with st.sidebar.expander("🤖 OPERATIONAL_PARAMS", expanded=True):
-        ui_temp = st.slider("Signal_Temp", 0.1, 1.5, 0.5)
-        ui_buy_threshold = st.slider("Buy_Threshold", 0.3, 0.8, 0.40)
-        ui_sell_threshold = st.slider("Sell_Threshold", 0.3, 0.8, 0.40)
+        ui_temp = st.slider("Signal_Temp", 0.1, 1.5, 0.5, step=0.01)
+        ui_buy_threshold = st.slider("Buy_Threshold", 0.3, 0.8, 0.40, step=0.01)
+        ui_sell_threshold = st.slider("Sell_Threshold", 0.3, 0.8, 0.40, step=0.01)
 
     # Mục 2: Market Filter
     with st.sidebar.expander("📡 RADAR_FILTERS", expanded=True):
-        ui_adx_min = st.slider("Min_ADX_Level", 10, 50, 20)
-        ui_adx_max = st.slider("Max_ADX_Level", 50, 100, 100)
+        ui_adx_min = st.slider("Min_ADX_Level", 10, 50, 20, step=1)
+        ui_adx_max = st.slider("Max_ADX_Level", 50, 100, 100, step=1)
         ui_use_dynamic = st.toggle("Activate_SMA_Filter", value=True)
 
     # Mục 3: Risk Management (PHẦN BỊ THIẾU 1)
     with st.sidebar.expander("⚖️ EXTRACTION_PROTOCOL", expanded=True):
-        ui_atr_sl = st.slider("Hard_Stop (ATR)", 1.0, 10.0, 3.5)
-        ui_atr_tp = st.slider("Target_Exit (ATR)", 5.0, 50.0, 20.0)
+        ui_atr_sl = st.slider("Hard_Stop (ATR)", 1.0, 10.0, 3.5, step=0.1)
+        ui_atr_tp = st.slider("Target_Exit (ATR)", 5.0, 50.0, 20.0, step=0.1)
 
     # Mục 4: Advanced Exit (PHẦN BỊ THIẾU 2)
     with st.sidebar.expander("🛡️ ADVANCED_EXIT", expanded=True):
@@ -405,6 +405,26 @@ def main():
             if final_sig != "NEUTRAL":
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
+                if ui_use_profit_lock:         
+                    current_profit_pct = 0.0 # Mặc định
+                    # Đoạn này sẽ tối ưu nếu bạn lưu entry_price vào session_state khi khớp lệnh
+                    if 'entry_price' in st.session_state and st.session_state.entry_price > 0:
+                        entry = st.session_state.entry_price
+                        if final_sig == "BUY":
+                            current_profit_pct = (price - entry) / entry * 100
+                        else:
+                            current_profit_pct = (entry - price) / entry * 100
+
+                        # Mốc 1: Lãi > 2.5% -> Dời SL về mức lãi 0.5%
+                        if current_profit_pct >= 2.5 and current_profit_pct < 5.0:
+                            sl_val = entry * 1.005 if final_sig == "BUY" else entry * 0.995
+                            reason = "PROFIT_LOCK_STAGE_1"
+                        
+                        # Mốc 2: Lãi > 5.0% -> Dời SL về mức lãi 3.0%
+                        elif current_profit_pct >= 5.0:
+                            sl_val = entry * 1.03 if final_sig == "BUY" else entry * 0.97
+                            reason = "PROFIT_LOCK_STAGE_2"
+                            
                 rr = abs(tp_val - price) / abs(price - sl_val)
 
                 with setup_placeholder.container():
@@ -481,6 +501,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
