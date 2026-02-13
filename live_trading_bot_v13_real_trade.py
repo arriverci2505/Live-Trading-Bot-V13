@@ -257,8 +257,8 @@ def main():
     # Mục 1: AI core
     with st.sidebar.expander("🤖 OPERATIONAL_PARAMS", expanded=True):
         ui_temp = st.slider("Signal_Temp", 0.1, 1.5, 0.5)
-        ui_buy_threshold = st.slider("Buy_Threshold", 0.3, 0.8, 0.45)
-        ui_sell_threshold = st.slider("Sell_Threshold", 0.3, 0.8, 0.45)
+        ui_buy_threshold = st.slider("Buy_Threshold", 0.3, 0.8, 0.40)
+        ui_sell_threshold = st.slider("Sell_Threshold", 0.3, 0.8, 0.40)
 
     # Mục 2: Market Filter
     with st.sidebar.expander("📡 RADAR_FILTERS", expanded=True):
@@ -268,7 +268,7 @@ def main():
 
     # Mục 3: Risk Management (PHẦN BỊ THIẾU 1)
     with st.sidebar.expander("⚖️ EXTRACTION_PROTOCOL", expanded=True):
-        ui_atr_sl = st.slider("Hard_Stop (ATR)", 1.0, 10.0, 4.0)
+        ui_atr_sl = st.slider("Hard_Stop (ATR)", 1.0, 10.0, 3.5)
         ui_atr_tp = st.slider("Target_Exit (ATR)", 5.0, 50.0, 20.0)
 
     # Mục 4: Advanced Exit (PHẦN BỊ THIẾU 2)
@@ -481,6 +481,7 @@ def main():
 if __name__ == "__main__":
     main()
             
+
 
 
 
