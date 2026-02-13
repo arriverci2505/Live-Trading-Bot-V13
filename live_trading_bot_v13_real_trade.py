@@ -301,6 +301,7 @@ def main():
     if 'trade_log' not in st.session_state: st.session_state.trade_log = []
     if 'last_signal_time' not in st.session_state: st.session_state.last_signal_time = ""
     if 'entry_price' not in st.session_state: st.session_state.entry_price = 0.0
+    if 'active_position' not in st.session_state: st.session_state.active_position = None
         
     try:
         model = load_monster_model()
@@ -402,73 +403,80 @@ def main():
                 display_logic_gate(gate_status, gate_metrics)
 
             # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
-           # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
-            if final_sig != "NEUTRAL":
-                # Cập nhật entry_price nếu là nến tín hiệu mới
-                current_min = datetime.now().strftime("%H:%M")
-                if st.session_state.last_signal_time != current_min:
-                    st.session_state.entry_price = price # Ghi nhận giá vào lệnh mới
-                
+            # --- 5.2 POSITION MANAGEMENT & ORDER LOGIC ---
+            price = df['Close'].iloc[-1]
+            
+            # TRƯỜNG HỢP 1: ĐANG CÓ LỆNH MỞ -> KIỂM TRA TP/SL
+            if st.session_state.active_position is not None:
+                pos = st.session_state.active_position
+                is_closed = False
+                exit_reason = ""
+
+                if pos['Action'] == "BUY":
+                    if price >= pos['TP']: is_closed, exit_reason = True, "TAKE_PROFIT 💰"
+                    elif price <= pos['SL']: is_closed, exit_reason = True, "STOP_LOSS 💀"
+                elif pos['Action'] == "SELL":
+                    if price <= pos['TP']: is_closed, exit_reason = True, "TAKE_PROFIT 💰"
+                    elif price >= pos['SL']: is_closed, exit_reason = True, "STOP_LOSS 💀"
+
+                if is_closed:
+                    # Ghi nhận việc đóng lệnh vào Log
+                    close_entry = {
+                        "Time": datetime.now().strftime("%H:%M:%S"),
+                        "Action": f"CLOSE_{pos['Action']}",
+                        "Price": f"{price:,.1f}",
+                        "Target": exit_reason,
+                        "Stop": "---",
+                        "AI%": "EXIT"
+                    }
+                    st.session_state.trade_log.insert(0, close_entry)
+                    st.session_state.active_position = None # Reset trạng thái để phút sau có thể vào lệnh mới
+            
+            # TRƯỜNG HỢP 2: ĐANG TRỐNG LỆNH -> XÉT VÀO LỆNH MỚI
+            elif final_sig != "NEUTRAL":
+                atr = df_enriched['ATR'].iloc[-1]
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
-                
-                # Logic Profit Lock (Sử dụng entry_price đã lưu)
-                if ui_use_profit_lock and st.session_state.entry_price > 0:
-                    entry = st.session_state.entry_price
-                    p_diff = (price - entry) / entry if final_sig == "BUY" else (entry - price) / entry
-                    p_pct = p_diff * 100
 
-                    if p_pct >= 5.0:
-                        sl_val = entry * 1.03 if final_sig == "BUY" else entry * 0.97
-                        reason = "LOCKED_PROFIT_3%"
-                    elif p_pct >= 2.5:
-                        sl_val = entry * 1.005 if final_sig == "BUY" else entry * 0.995
-                        reason = "LOCKED_BE_PLUS"
-                
-                rr = abs(tp_val - price) / abs(price - sl_val) if abs(price - sl_val) != 0 else 0
+                # Lưu thông tin lệnh vào session_state
+                st.session_state.active_position = {
+                    "Action": final_sig,
+                    "Entry": price,
+                    "TP": tp_val,
+                    "SL": sl_val
+                }
 
-                with setup_placeholder.container():
-                    st.markdown(f"""
-                    <div class="trade-setup">
-                        <div class="crt-glow">> INITIATING_TARGET: {tp_val:,.1f}</div>
-                        <div class="crt-glow">> STOP_LOSS_LIMIT:  {sl_val:,.1f}</div>
-                        <div class="crt-glow">> RISK_REWARD_RATIO: 1:{rr:.1f}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                # Ghi Log vào lệnh
+                new_entry = {
+                    "Time": datetime.now().strftime("%H:%M:%S"),
+                    "Action": final_sig,
+                    "Price": f"{price:,.1f}",
+                    "Target": f"{tp_val:,.1f}",
+                    "Stop": f"{sl_val:,.1f}",
+                    "AI%": f"{conf:.1%}"
+                }
+                st.session_state.trade_log.insert(0, new_entry)
 
-                # Chặn trùng lặp log trong cùng 1 phút
-                current_min = datetime.now().strftime("%H:%M")
-                if st.session_state.last_signal_time != current_min:
-                    st.session_state.last_signal_time = current_min
-                    new_entry = {
-                        "Time": datetime.now().strftime("%H:%M:%S"),
-                        "Action": final_sig,
-                        "Price": f"{price:,.1f}",
-                        "Target": f"{tp_val:,.1f}",
-                        "Stop": f"{sl_val:,.1f}",
-                        "AI%": f"{conf:.1%}"
-                    }
-                    st.session_state.trade_log.insert(0, new_entry)
+                # Gửi Telegram
+                if tg_token and tg_chat_id:
+                    alert_text = (
+                        f"🚀 *TITAN SIGNAL DETECTED*\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"🎯 *ACTION:* {final_sig}\n"
+                        f"💰 *PRICE:* ${price:,.1f}\n"
+                        f"📊 *CONFIDENCE:* {conf:.1%}\n"
+                        f"🛡️ *TP:* {tp_val:,.1f} | *SL:* {sl_val:,.1f}\n"
+                        f"⏰ *TIME:* {datetime.now().strftime('%H:%M:%S')}"
+                    )
+                    send_telegram_msg(tg_token, tg_chat_id, alert_text)
+                # Auto-Backup ra file CSV để ko mất dữ liệu khi tắt bot
+                try:
+                    file_name = "titan_audit_trail.csv"
+                    pd.DataFrame([new_entry]).to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False)
+                except: pass
                     
-                    if tg_token and tg_chat_id:
-                        alert_text = (
-                            f"🚀 *TITAN SIGNAL DETECTED*\n"
-                            f"━━━━━━━━━━━━━━━\n"
-                            f"🎯 *ACTION:* {final_sig}\n"
-                            f"💰 *PRICE:* ${price:,.1f}\n"
-                            f"📊 *CONFIDENCE:* {conf:.1%}\n"
-                            f"🛡️ *TP:* {tp_val:,.1f} | *SL:* {sl_val:,.1f}\n"
-                            f"⏰ *TIME:* {datetime.now().strftime('%H:%M:%S')}"
-                        )
-                        send_telegram_msg(tg_token, tg_chat_id, alert_text)
-                    # Auto-Backup ra file CSV để ko mất dữ liệu khi tắt bot
-                    try:
-                        file_name = "titan_audit_trail.csv"
-                        pd.DataFrame([new_entry]).to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False)
-                    except: pass
-                    
-                    # Âm thanh cảnh báo
-                    components.html("<script>playAlert();</script>", height=0)
+                # Âm thanh cảnh báo
+                components.html("<script>playAlert();</script>", height=0)
             else:
                 setup_placeholder.empty()
 
@@ -491,14 +499,17 @@ def main():
                     )
 
             # --- VÒNG LẶP CHỜ QUÉT LẦN TIẾP THEO ---
-            time.sleep(60)
+            now = datetime.now()
+            seconds_until_next_minute = 60 - now.second
+            time.sleep(max(1, seconds_until_next_minute))
             st.rerun()
 
         except Exception as e:
             st.error(f"SYSTEM CRITICAL ERROR: {e}")
-            time.sleep(10)
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()
             
+
 
