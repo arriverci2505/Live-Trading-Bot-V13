@@ -40,19 +40,17 @@ def send_telegram_msg(token, chat_id, message):
         print(f"Telegram Error: {e}")
 
 def display_logic_gate(check_results, metrics):
+    """Hiển thị thông số với viền phát sáng (Glow) chuẩn style Titan"""
     cols = st.columns(len(check_results))
-    # Tạo map để hiển thị tên thân thiện hơn
-    friendly_names = {"AI_PROB": "🤖 AI_CONF", "ADX_LEVEL": "📡 TREND", "SMA_BIAS": "⚖️ BIAS"}
-    
-    for i, (key, passed) in enumerate(check_results.items()):
+    for i, (label, passed) in enumerate(check_results.items()):
+        # Màu sắc: Xanh lân quang nếu Pass, Đỏ rực nếu Fail
         color = "#00FF41" if passed else "#FF0000"
-        label = friendly_names.get(key, key)
         with cols[i]:
             st.markdown(f"""
-            <div style="padding: 15px; border: 2px solid {color}; background: rgba(0, 30, 0, 0.4); text-align: center; border-radius: 8px;">
-                <div style="color: {color}; font-size: 11px;">{label}</div>
-                <div style="color: white; font-size: 18px; font-weight: bold;">{metrics.get(key, 'N/A')}</div>
-                <div style="color: {color}; font-size: 9px;">{">> PASS" if passed else ">> FAIL"}</div>
+            <div style="padding: 15px; border: 2px solid {color}; background: rgba(0, 30, 0, 0.4);box-shadow: 0 0 15px {color}44;text-align: center;border-radius: 8px;margin-bottom: 10px;font-family: 'Fira Code', monospace;">
+                <div style="color: {color}; font-size: 11px; text-shadow: 0 0 5px {color}; opacity: 0.8;">{label}</div>
+                <div style="color: white; font-size: 18px; font-weight: bold; margin: 8px 0;">{metrics.get(label, 'N/A')}</div>
+                <div style="color: {color}; font-size: 9px; letter-spacing: 1px;">{">> PASS" if passed else ">> FAIL"}</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -503,3 +501,4 @@ def main():
 if __name__ == "__main__":
     main()
             
+
