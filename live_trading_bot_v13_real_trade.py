@@ -40,18 +40,19 @@ def send_telegram_msg(token, chat_id, message):
         print(f"Telegram Error: {e}")
 
 def display_logic_gate(check_results, metrics):
-    """Hiển thị thông số với viền phát sáng (Glow) chuẩn style Titan"""
     cols = st.columns(len(check_results))
-    for i, (label, passed) in enumerate(check_results.items()):
-        # Màu sắc: Xanh lân quang nếu Pass, Đỏ rực nếu Fail
+    # Tạo map để hiển thị tên thân thiện hơn
+    friendly_names = {"AI_PROB": "🤖 AI_CONF", "ADX_LEVEL": "📡 TREND", "SMA_BIAS": "⚖️ BIAS"}
+    
+    for i, (key, passed) in enumerate(check_results.items()):
         color = "#00FF41" if passed else "#FF0000"
-        
+        label = friendly_names.get(key, key)
         with cols[i]:
             st.markdown(f"""
-            <div style="padding: 15px; border: 2px solid {color}; background: rgba(0, 30, 0, 0.4);box-shadow: 0 0 15px {color}44;text-align: center;border-radius: 8px;margin-bottom: 10px;font-family: 'Fira Code', monospace;">
-                <div style="color: {color}; font-size: 11px; text-shadow: 0 0 5px {color}; opacity: 0.8;">{label}</div>
-                <div style="color: white; font-size: 18px; font-weight: bold; margin: 8px 0;">{metrics.get(label, 'N/A')}</div>
-                <div style="color: {color}; font-size: 9px; letter-spacing: 1px;">{">> PASS" if passed else ">> FAIL"}</div>
+            <div style="padding: 15px; border: 2px solid {color}; background: rgba(0, 30, 0, 0.4); text-align: center; border-radius: 8px;">
+                <div style="color: {color}; font-size: 11px;">{label}</div>
+                <div style="color: white; font-size: 18px; font-weight: bold;">{metrics.get(key, 'N/A')}</div>
+                <div style="color: {color}; font-size: 9px;">{">> PASS" if passed else ">> FAIL"}</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -301,7 +302,8 @@ def main():
     # --- 4. DATA INITIALIZATION ---
     if 'trade_log' not in st.session_state: st.session_state.trade_log = []
     if 'last_signal_time' not in st.session_state: st.session_state.last_signal_time = ""
-
+    if 'entry_price' not in st.session_state: st.session_state.entry_price = 0.0
+        
     try:
         model = load_monster_model()
         exchange = ccxt.kraken({'enableRateLimit': True})
@@ -402,30 +404,30 @@ def main():
                 display_logic_gate(gate_status, gate_metrics)
 
             # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
+           # --- 5.2 ORDER SETUP & DYNAMIC CALCULATION ---
             if final_sig != "NEUTRAL":
+                # Cập nhật entry_price nếu là nến tín hiệu mới
+                current_min = datetime.now().strftime("%H:%M")
+                if st.session_state.last_signal_time != current_min:
+                    st.session_state.entry_price = price # Ghi nhận giá vào lệnh mới
+                
                 sl_val = price - (atr * ui_atr_sl) if final_sig == "BUY" else price + (atr * ui_atr_sl)
                 tp_val = price + (atr * ui_atr_tp) if final_sig == "BUY" else price - (atr * ui_atr_tp)
-                if ui_use_profit_lock:         
-                    current_profit_pct = 0.0 # Mặc định
-                    # Đoạn này sẽ tối ưu nếu bạn lưu entry_price vào session_state khi khớp lệnh
-                    if 'entry_price' in st.session_state and st.session_state.entry_price > 0:
-                        entry = st.session_state.entry_price
-                        if final_sig == "BUY":
-                            current_profit_pct = (price - entry) / entry * 100
-                        else:
-                            current_profit_pct = (entry - price) / entry * 100
+                
+                # Logic Profit Lock (Sử dụng entry_price đã lưu)
+                if ui_use_profit_lock and st.session_state.entry_price > 0:
+                    entry = st.session_state.entry_price
+                    p_diff = (price - entry) / entry if final_sig == "BUY" else (entry - price) / entry
+                    p_pct = p_diff * 100
 
-                        # Mốc 1: Lãi > 2.5% -> Dời SL về mức lãi 0.5%
-                        if current_profit_pct >= 2.5 and current_profit_pct < 5.0:
-                            sl_val = entry * 1.005 if final_sig == "BUY" else entry * 0.995
-                            reason = "PROFIT_LOCK_STAGE_1"
-                        
-                        # Mốc 2: Lãi > 5.0% -> Dời SL về mức lãi 3.0%
-                        elif current_profit_pct >= 5.0:
-                            sl_val = entry * 1.03 if final_sig == "BUY" else entry * 0.97
-                            reason = "PROFIT_LOCK_STAGE_2"
-                            
-                rr = abs(tp_val - price) / abs(price - sl_val)
+                    if p_pct >= 5.0:
+                        sl_val = entry * 1.03 if final_sig == "BUY" else entry * 0.97
+                        reason = "LOCKED_PROFIT_3%"
+                    elif p_pct >= 2.5:
+                        sl_val = entry * 1.005 if final_sig == "BUY" else entry * 0.995
+                        reason = "LOCKED_BE_PLUS"
+                
+                rr = abs(tp_val - price) / abs(price - sl_val) if abs(price - sl_val) != 0 else 0
 
                 with setup_placeholder.container():
                     st.markdown(f"""
@@ -501,33 +503,3 @@ def main():
 if __name__ == "__main__":
     main()
             
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
